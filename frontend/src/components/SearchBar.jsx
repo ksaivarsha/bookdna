@@ -1,45 +1,48 @@
 import { useState } from 'react'
-import { searchBooks } from '../services/api'
-
-const CARD_STYLE = {
-  maxWidth: 120,
-  textAlign: 'center',
-  fontSize: '0.85rem',
-  fontFamily: 'EB Garamond, serif',
-  color: '#1a1208',
-}
+import { searchBooks, addToHistory, getRecommendationsByCategory } from '../services/api'
+import { CategorySection } from './CategorySection'
 
 function BookCard({ book }) {
   return (
-    <div style={CARD_STYLE}>
-      {book.cover
-        ? <img src={book.cover} alt={book.title}
-            style={{ width: 80, height: 112, objectFit: 'cover', display: 'block', margin: '0 auto 6px' }} />
-        : <div style={{ width: 80, height: 112, background: '#d9c99a', margin: '0 auto 6px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.7rem', color: '#7a5c2a' }}>No cover</div>
-      }
-      <div style={{ fontWeight: 600, lineHeight: 1.2, marginBottom: 2 }}>{book.title}</div>
-      <div style={{ opacity: 0.7 }}>{(book.authors || []).join(', ')}</div>
+    <div className="book-card-small">
+      {book.cover ? (
+        <img src={book.cover} alt={book.title} className="book-card-small__cover" />
+      ) : (
+        <div className="book-card-small__no-cover">No cover</div>
+      )}
+      <div className="book-card-small__title">{book.title}</div>
+      <div className="book-card-small__author">{(book.authors || []).join(', ')}</div>
     </div>
   )
 }
 
-export function SearchBar() {
-  const [query, setQuery]     = useState('')
-  const [focused, setFocused] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const [results, setResults] = useState(null)
+export function SearchBar({ onSearch }) {
+  const [query, setQuery]           = useState('')
+  const [focused, setFocused]       = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
+  const [results, setResults]       = useState(null)
+  const [catLoading, setCatLoading] = useState(false)
+  const [categories, setCategories] = useState(null)
 
   async function handleSearch() {
     if (!query.trim()) return
     setLoading(true)
     setError('')
     setResults(null)
+    setCategories(null)
     try {
       const data = await searchBooks(query)
       setResults(data)
+      onSearch?.()
+      addToHistory(data.source)
+      setCatLoading(true)
+      getRecommendationsByCategory(data.source)
+        .then(rec => {
+          if (!rec.fallback && rec.categories?.length) setCategories(rec.categories)
+        })
+        .catch(() => {})
+        .finally(() => setCatLoading(false))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -85,19 +88,23 @@ export function SearchBar() {
       )}
 
       {results && !loading && (
-        <div style={{ width: '100%', fontFamily: 'EB Garamond, serif', color: '#1a1208' }}>
-          <p style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: '1rem', fontSize: '0.95rem' }}>
+        <div className="search-results">
+          <p className="search-results__source">
             <em>{results.source.title}</em>
             {results.source.authors?.[0] && <> by {results.source.authors[0]}</>}
           </p>
-          {results.recommendations.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16,
-              justifyContent: 'center', marginTop: 8 }}>
+
+          {/* Phase 1: genre fallback recs (always shown until category recs replace them) */}
+          {!categories && results.recommendations.length > 0 && (
+            <div className="genre-recs">
               {results.recommendations.map(book => (
                 <BookCard key={book.id} book={book} />
               ))}
             </div>
           )}
+
+          {/* Phase 2: categorized recs */}
+          <CategorySection categories={categories} loading={catLoading} />
         </div>
       )}
     </section>

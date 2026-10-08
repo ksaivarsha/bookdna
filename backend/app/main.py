@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
+from app.db import init_db
 from app.routes.books import router as books_router
+from app.routes.recommendations import router as recs_router
+from app.routes.history import router as history_router
 
 load_dotenv()
 
@@ -17,7 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+init_db()
+
 app.include_router(books_router, prefix="/books")
+app.include_router(recs_router, prefix="/recommendations")
+app.include_router(history_router, prefix="/history")
 
 
 @app.get("/")

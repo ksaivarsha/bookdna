@@ -1,8 +1,8 @@
 # BookDNA
 
-> Enter a title, an author, or a feeling — the library will find you a door.
+> Enter a title, an author, or a feeling -- the library will find you a door.
 
-BookDNA is a book recommendation web app with a Victorian manuscript aesthetic. Give it any book, and it surfaces six genre-matched recommendations drawn from the Open Library.
+BookDNA is a book recommendation web app with a Victorian manuscript aesthetic. Give it any book and it surfaces categorised recommendations drawn from the Open Library and analysed by an AI that reads the book's DNA.
 
 ![BookDNA screenshot](docs/screenshot.png)
 
@@ -10,18 +10,31 @@ BookDNA is a book recommendation web app with a Victorian manuscript aesthetic. 
 
 ## Why I built this
 
-<!-- TODO: Edit this section in your own words before publishing -->
-I love reading — especially romantasy and fantasy — and I wanted book recommendations that feel personal rather than algorithmic. Every tool I tried felt like a spreadsheet. I wanted something that felt like stepping into a candlelit library where a very well-read librarian already knew what you were looking for. BookDNA is that librarian.
+I love reading -- especially romantasy and fantasy -- and I wanted book recommendations that feel personal rather than algorithmic. Every tool I tried felt like a spreadsheet. I wanted something that felt like stepping into a candlelit library where a very well-read librarian already knew what you were looking for. BookDNA is that librarian.
 
 ---
 
 ## Features
 
-- **Book search** — search by title, author, or keyword; BookDNA queries the Open Library and returns the closest match
-- **Genre-based recommendations** — each result comes with six books drawn from the same subject or genre as your query
-- **Victorian aesthetic** — ornate SVG page borders, decorative friezes with fleur-de-lis motifs, and corner acanthus ornaments give the UI the feel of a printed manuscript
-- **Atmospheric mist background** — layered warm-mist animations create a candlelit, parchment-and-ink feel
-- **Cycling whisper phrases** — evocative literary phrases cycle beneath the logo to set the mood before you search
+- **Book search** -- search by title, author, or keyword; BookDNA queries the Open Library and returns the closest match
+- **DNA-powered categorised recommendations** -- each result comes with four shelves: *Similar Storyline*, *Similar Tropes*, *Similar World/Setting*, and *Same Vibe*; each book includes a one-line reason it was chosen
+- **Hallucination prevention** -- every AI-suggested title is validated against Open Library before it appears; made-up books are silently dropped
+- **SQLite caching** -- each book's DNA is cached so repeated searches are instant and free
+- **Personalised homepage** -- a "Because you searched..." section surfaces recommendations from your most recent search when you return to the app
+- **Anonymous sessions** -- no account needed; your search history lives in a browser session ID stored in localStorage
+- **Genre fallback** -- if no API key is configured, the app falls back to Open Library genre recommendations so it always works
+- **Victorian aesthetic** -- ornate SVG page borders, decorative friezes, and corner acanthus ornaments give the UI the feel of a printed manuscript
+- **Atmospheric mist background** -- layered warm-mist animations create a candlelit, parchment-and-ink feel
+
+---
+
+## How recommendations work
+
+1. You search for a book. The backend queries Open Library and returns the closest match instantly (Phase 1 -- genre recs from Open Library appear immediately).
+2. In the background, the backend sends the book's title, authors, and subjects to Claude (Haiku 4.5) and asks it to suggest 6 real books in each of four categories.
+3. Every suggested title is validated against Open Library in parallel. Titles that cannot be confirmed are dropped.
+4. Validated results replace the genre fallback on screen (Phase 2).
+5. The book's DNA is cached in SQLite so the next search for the same book skips the AI call entirely.
 
 ---
 
@@ -31,8 +44,10 @@ I love reading — especially romantasy and fantasy — and I wanted book recomm
 |---|---|
 | Frontend | React 18, Vite 6 |
 | Backend | Python 3, FastAPI, uvicorn |
-| Data source | [Open Library API](https://openlibrary.org/developers/api) — no key required |
+| AI | Anthropic API (Claude Haiku 4.5) |
+| Data source | [Open Library API](https://openlibrary.org/developers/api) -- no key required |
 | HTTP client | httpx (async) |
+| Cache / history | SQLite (built-in Python) |
 | Styling | Plain CSS with custom properties |
 
 ---
@@ -43,6 +58,7 @@ I love reading — especially romantasy and fantasy — and I wanted book recomm
 
 - Python 3.10+
 - Node.js 18+
+- An Anthropic API key (optional -- the app works without one, using genre fallback)
 
 ### 1. Clone
 
@@ -57,11 +73,11 @@ cd bookdna
 cd backend
 pip install -r requirements.txt
 cp .env.example .env   # Windows: copy .env.example .env
+# Edit .env and paste your ANTHROPIC_API_KEY (leave blank to use genre fallback)
 uvicorn app.main:app --reload
 ```
 
-The API starts at **http://localhost:8000**.  
-The default `.env` values work for local development — no changes needed.
+The API starts at **http://localhost:8000**.
 
 ### 3. Frontend
 
@@ -79,11 +95,9 @@ The app opens at **http://localhost:5173**.
 
 ## What I'd build next
 
-<!-- TODO: Edit, reorder, or replace these with your own ideas -->
-
-1. **Genre mood selector** — let users pick a reading mood (romantasy, sci-fi, thriller, horror) and have the UI retheme itself with a cinematic transition; the theme system and transition infrastructure are already in the codebase, just not wired to the UI yet
-2. **Richer book cards** — display description, page count, and star rating on each recommendation card; the Open Library data is already fetched, just not shown
-3. **Reading list** — let users bookmark books to a personal list, persisted in `localStorage` or a lightweight backend store
+1. **Reading list** -- let users bookmark books to a personal list, persisted in localStorage or a lightweight backend store; the session infrastructure is already in place
+2. **Deeper personalisation** -- use the full search history (not just the most recent book) to build a taste profile and generate a blended "For You" shelf across multiple books
+3. **Genre mood selector** -- let users pick a reading mood (romantasy, sci-fi, thriller, horror) and have the UI retheme itself with a cinematic transition; the theme system and transition infrastructure are already in the codebase
 
 ---
 

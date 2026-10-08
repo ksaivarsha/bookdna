@@ -45,5 +45,8 @@ desktop.ini
 *.iml
 .vscode/
 
+# ── SQLite database ───────────────────────────────────────
+bookdna.db
+
 # ── Docs assets (screenshot goes here — don't ignore) ────
 # docs/ is intentionally tracked

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import './index.css'
 import './App.css'
 import { ThemeProvider }        from './contexts/ThemeContext'
@@ -7,37 +8,30 @@ import { Frieze }               from './components/Frieze'
 import { DividerOrnament }      from './components/DividerOrnament'
 import { Logo }                 from './components/Logo'
 import { SearchBar }            from './components/SearchBar'
+import { ForYouSection }        from './components/ForYouSection'
 import { CinematicTransition }  from './components/CinematicTransition'
 
 function BookPage() {
+  const [searched, setSearched] = useState(false)
+
   return (
     <div className="book-page">
-      {/* Atmosphere mist layer */}
       <BackgroundLayer />
-
-      {/* Ornate printed border (fixed, above content) */}
       <PageBorder />
 
-      {/* Main page content */}
       <main className="page-content">
-        {/* Top engraving frieze */}
         <Frieze />
-
         <DividerOrnament />
-
-        {/* Title, tagline, whisper */}
         <Logo />
-
         <DividerOrnament />
 
-        {/* Search */}
-        <SearchBar />
+        {!searched && <ForYouSection />}
 
-        {/* Bottom tailpiece */}
+        <SearchBar onSearch={() => setSearched(true)} />
+
         <DividerOrnament variant="tail" />
       </main>
 
-      {/* Cinematic warp when AI book theme fires from backend */}
       <CinematicTransition />
     </div>
   )
