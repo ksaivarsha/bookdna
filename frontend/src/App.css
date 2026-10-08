@@ -351,6 +351,21 @@
     0 -1px 1px rgba(60, 35, 8, 0.35);
 }
 
+/* Styled error — looks like a stamped annotation on parchment */
+.search-error {
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 0.88rem;
+  color: #5c1a1a;
+  text-align: center;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: 0.5px solid rgba(92, 26, 26, 0.28);
+  background: rgba(92, 26, 26, 0.04);
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
 .search-input,
 .search-btn {
   text-shadow:

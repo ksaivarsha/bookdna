@@ -78,7 +78,7 @@ export function SearchBar({ onSearch }) {
         <p className="search-hint"><em>Consulting the library…</em></p>
       )}
       {error && !loading && (
-        <p className="search-hint" style={{ color: '#8b2020' }}>{error}</p>
+        <p className="search-error">{error}</p>
       )}
       {!loading && !error && !results && (
         <p className="search-hint">
