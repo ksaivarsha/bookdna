@@ -2,7 +2,7 @@ import json
 import os
 import anthropic
 
-MODEL = "claude-haiku-4-5"
+MODEL = "claude-haiku-5-5"
 
 _CATEGORY_LABELS = [
     "Similar Storyline",
@@ -59,10 +59,13 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences — in th
         client = anthropic.AsyncAnthropic(api_key=api_key)
         message = await client.messages.create(
             model=MODEL,
-            max_tokens=1800,
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = message.content[0].text.strip()
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        if text_block is None:
+            return None
+        raw = text_block.text.strip()
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start == -1 or end == 0:

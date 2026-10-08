@@ -66,7 +66,7 @@ async def _validate_candidate(
 
 
 async def validate_category(candidates: list) -> list:
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         results = await asyncio.gather(
             *[_validate_candidate(client, c) for c in candidates]
         )
