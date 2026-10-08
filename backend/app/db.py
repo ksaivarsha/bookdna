@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import time
 from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "bookdna.db")
@@ -41,6 +42,13 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS idx_history_session "
             "ON search_history(session_id, searched_at)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ol_cache (
+                cache_key TEXT PRIMARY KEY,
+                docs_json TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        """)
 
 
 def get_cached_dna(book_id: str) -> dict | None:
@@ -79,6 +87,32 @@ def add_to_history(
             "(session_id, book_id, book_title, book_authors, book_cover) "
             "VALUES (?, ?, ?, ?, ?)",
             (session_id, book_id, book_title, json.dumps(book_authors), book_cover or ""),
+        )
+
+
+OL_CACHE_TTL_DAYS = 7
+
+
+def get_ol_cache(key: str) -> list | None:
+    """Return cached OL docs list, or None if missing/expired."""
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT docs_json, created_at FROM ol_cache WHERE cache_key = ?", (key,)
+        ).fetchone()
+        if not row:
+            return None
+        age_days = (time.time() - row["created_at"]) / 86400
+        if age_days > OL_CACHE_TTL_DAYS:
+            conn.execute("DELETE FROM ol_cache WHERE cache_key = ?", (key,))
+            return None
+        return json.loads(row["docs_json"])
+
+
+def set_ol_cache(key: str, docs: list):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO ol_cache (cache_key, docs_json) VALUES (?, ?)",
+            (key, json.dumps(docs)),
         )
 
 
