@@ -35,6 +35,7 @@ I love reading -- especially romantasy and fantasy -- and I wanted book recommen
 3. Every suggested title is validated against Open Library in parallel. Titles that cannot be confirmed are dropped.
 4. Validated results replace the genre fallback on screen (Phase 2).
 5. The book's DNA is cached in SQLite so the next search for the same book skips the AI call entirely.
+6. Open Library search results and validated book lookups are also cached in SQLite for seven days. If Open Library is unavailable, previously cached results are served transparently. A book searched for the first time during an outage shows a friendly message ("The library's archives are unreachable…") rather than a crash; repeat searches always work from cache. Category recommendations follow the same pattern -- cached validations survive outages, and uncacheable candidates are silently dropped so whatever has been validated is still returned.
 
 ---
 
