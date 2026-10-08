@@ -1,0 +1,93 @@
+/* ── Reset ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* EB Garamond everywhere — no other font permitted on this page */
+:root {
+  --font: 'EB Garamond', Georgia, serif;
+  --ink:         #1a1208;
+  --ink-light:   #2a1e08;
+  --ink-gold:    #7a5010;
+  --ink-muted:   #6a5030;
+  --parchment:   #e8d5a0;
+  --parchment-d: #d4be84;
+}
+
+html {
+  font-size: 16px;
+  /* Remove screen glow — the whole document feels printed */
+  filter: sepia(0.15) contrast(0.97);
+}
+
+body {
+  font-family: var(--font);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  background: var(--parchment);
+}
+
+::selection {
+  background: rgba(122, 80, 16, 0.25);
+  color: var(--ink);
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--parchment-d); }
+::-webkit-scrollbar-thumb { background: #8a6030; }
+
+/* ── Warm mist animations ────────────────────────── */
+@keyframes wmist-bl {
+  0%, 100% { transform: translate(0, 0)   scale(1);    opacity: 0.7; }
+  50%       { transform: translate(24px,-18px) scale(1.08); opacity: 1;   }
+}
+@keyframes wmist-bc {
+  0%, 100% { transform: translate(0, 0)    scale(1);    opacity: 0.8; }
+  45%       { transform: translate(-12px,-10px) scale(1.05); opacity: 0.6; }
+}
+@keyframes wmist-br {
+  0%, 100% { transform: translate(0, 0)    scale(1);    opacity: 0.65; }
+  55%       { transform: translate(-20px,-14px) scale(1.1);  opacity: 1;   }
+}
+@keyframes wmist-sl {
+  0%, 100% { transform: translateX(0)  opacity: 0.5; }
+  50%       { transform: translateX(18px); opacity: 0.85; }
+}
+@keyframes wmist-sr {
+  0%, 100% { transform: translateX(0)   opacity: 0.5; }
+  50%       { transform: translateX(-18px); opacity: 0.85; }
+}
+
+/* ── WhisperText fade ────────────────────────────── */
+/* opacity handled inline by WhisperText component */
+
+/* ── Particle / ThemeEngine (preserved for AI themes) ── */
+@keyframes drift-1 {
+  0%   { opacity: 0; transform: translateY(0)   rotate(0deg);   }
+  12%  { opacity: var(--p-op, 0.25); }
+  88%  { opacity: var(--p-op, 0.25); }
+  100% { opacity: 0; transform: translateY(-80px) rotate(130deg); }
+}
+@keyframes drift-2 {
+  0%   { opacity: 0; transform: translateY(0)   rotate(20deg);  }
+  15%  { opacity: var(--p-op, 0.25); }
+  85%  { opacity: var(--p-op, 0.25); }
+  100% { opacity: 0; transform: translateY(-65px) rotate(-80deg); }
+}
+@keyframes drift-3 {
+  0%   { opacity: 0; transform: translateY(0)   rotate(-15deg); }
+  18%  { opacity: var(--p-op, 0.25); }
+  82%  { opacity: var(--p-op, 0.25); }
+  100% { opacity: 0; transform: translateY(-95px) rotate(220deg); }
+}
+@keyframes drift-4 {
+  0%   { opacity: 0; transform: translateY(0)   rotate(45deg);  }
+  10%  { opacity: var(--p-op, 0.25); }
+  90%  { opacity: var(--p-op, 0.25); }
+  100% { opacity: 0; transform: translateY(-58px) rotate(165deg); }
+}
+@keyframes drift-5 {
+  0%   { opacity: 0; transform: translateY(0)   rotate(-30deg); }
+  20%  { opacity: var(--p-op, 0.25); }
+  80%  { opacity: var(--p-op, 0.25); }
+  100% { opacity: 0; transform: translateY(-72px) rotate(-50deg); }
+}

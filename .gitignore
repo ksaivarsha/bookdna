@@ -1,0 +1,49 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment variables (never commit real secrets)
+.env
+.env.local
+.env.*.local
+
+# Test / coverage artifacts
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+
+# ── Node / Vite ───────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS files ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ─────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+
+# ── Docs assets (screenshot goes here — don't ignore) ────
+# docs/ is intentionally tracked

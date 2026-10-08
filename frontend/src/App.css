@@ -1,0 +1,402 @@
+/* ═══════════════════════════════════════════════════════════════
+   THE BOOK PAGE — parchment texture, sepia wash, ruling lines,
+   corner darkening. This is the single most important block.
+   ═══════════════════════════════════════════════════════════════ */
+
+.book-page {
+  min-height: 100vh;
+  position: relative;
+
+  /* 1 — Real parchment texture tiled */
+  background-color: var(--parchment);
+  background-image: url('https://www.transparenttextures.com/patterns/old-map.png');
+  background-repeat: repeat;
+}
+
+/* 2 — Sepia wash + corner darkening (fixed so it covers viewport always) */
+.book-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    /* Warm sepia wash */
+    linear-gradient(rgba(180,140,60,0.13), rgba(180,140,60,0.13)),
+    /* Corner darkening — aged paper edges */
+    radial-gradient(ellipse 48% 42% at   0%   0%, rgba(55,30,5,0.42) 0%, transparent 100%),
+    radial-gradient(ellipse 48% 42% at 100%   0%, rgba(55,30,5,0.42) 0%, transparent 100%),
+    radial-gradient(ellipse 48% 42% at   0% 100%, rgba(55,30,5,0.42) 0%, transparent 100%),
+    radial-gradient(ellipse 48% 42% at 100% 100%, rgba(55,30,5,0.42) 0%, transparent 100%),
+    /* Edge darkening strip (top/bottom) */
+    linear-gradient(rgba(40,20,5,0.18), transparent 12%, transparent 88%, rgba(40,20,5,0.18));
+}
+
+/* 3 — Manuscript ruling lines (fixed overlay) */
+.book-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: repeating-linear-gradient(
+    transparent 0px,
+    transparent 27px,
+    rgba(80, 50, 15, 0.045) 27px,
+    rgba(80, 50, 15, 0.045) 28px
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WARM MIST — parchment-coloured, not grey or green
+   ═══════════════════════════════════════════════════════════════ */
+
+.warm-mist {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.wmist {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  background: rgba(220, 195, 130, 0.08);
+}
+
+.wmist--bl {
+  bottom: -80px; left: -100px;
+  width: 480px; height: 240px;
+  animation: wmist-bl 26s ease-in-out infinite;
+}
+.wmist--bc {
+  bottom: -100px; left: 50%;
+  transform: translateX(-50%);
+  width: 560px; height: 200px;
+  animation: wmist-bc 22s ease-in-out infinite;
+}
+.wmist--br {
+  bottom: -80px; right: -100px;
+  width: 480px; height: 240px;
+  animation: wmist-br 30s ease-in-out infinite;
+}
+.wmist--sl {
+  top: 20%; left: -120px;
+  width: 240px; height: 400px;
+  animation: wmist-sl 28s ease-in-out infinite;
+}
+.wmist--sr {
+  top: 20%; right: -120px;
+  width: 240px; height: 400px;
+  animation: wmist-sr 32s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ORNATE BORDER — fixed, above content
+   ═══════════════════════════════════════════════════════════════ */
+
+.border-outer,
+.border-inner {
+  position: fixed;
+  pointer-events: none;
+  z-index: 50;
+}
+.border-outer {
+  inset: 18px;
+  border: 1.5px solid var(--ink-light);
+}
+.border-inner {
+  inset: 26px;
+  border: 0.5px solid var(--ink-light);
+}
+
+/* Corner ornaments */
+.corner-orn {
+  position: fixed;
+  z-index: 52;
+  pointer-events: none;
+  width: 72px;
+  height: 72px;
+}
+.corner-orn--tl { top: 4px;    left: 4px; }
+.corner-orn--tr { top: 4px;    right: 4px; }
+.corner-orn--bl { bottom: 4px; left: 4px; }
+.corner-orn--br { bottom: 4px; right: 4px; }
+
+/* Top/bottom centre ornaments */
+.center-orn {
+  position: fixed;
+  z-index: 1;
+  pointer-events: none;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.center-orn--top { top: 20px; }
+.center-orn--bot { bottom: 20px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE CONTENT LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+
+.page-content {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 70px 40px 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.8rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FRIEZE — the engraving illustration
+   ═══════════════════════════════════════════════════════════════ */
+
+.frieze-svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DIVIDER ORNAMENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+.divider-ornament {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.divider-svg {
+  display: block;
+  max-width: 100%;
+}
+
+.tailpiece-svg {
+  opacity: 0.85;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOGO — embossed ink on parchment
+   ═══════════════════════════════════════════════════════════════ */
+
+.logo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.logo-wordmark {
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: clamp(2.6rem, 7vw, 3.4rem);
+  letter-spacing: 0.38em;
+  color: var(--ink);
+  text-transform: uppercase;
+  line-height: 1;
+  text-shadow:
+    0  1px 2px rgba(255, 240, 180, 0.5),
+    0 -1px 1px rgba(60, 35, 8, 0.35);
+}
+
+.logo-dna {
+  color: #d4a017;
+  text-shadow: 0 1px 0 rgba(255,220,80,0.6), 0 -1px 0 rgba(100,60,0,0.4);
+}
+
+/* Thin hairline rule (like a printed rule beneath a heading) */
+.logo-hairline {
+  width: 90%;
+  height: 0;
+  border: none;
+  border-top: 0.5px solid var(--ink-light);
+  margin: 0.1rem 0;
+  opacity: 0.6;
+}
+
+.logo-tagline {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  opacity: 0.85;
+  text-shadow:
+    0  1px 2px rgba(255, 240, 180, 0.5),
+    0 -1px 1px rgba(60, 35, 8, 0.35);
+}
+
+/* The slowly cycling italic whisper line */
+.whisper-text {
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+  margin-top: 0.2rem;
+  transition: opacity 1.4s ease;
+  text-shadow:
+    0  1px 2px rgba(255, 240, 180, 0.5),
+    0 -1px 1px rgba(60, 35, 8, 0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEARCH BAR — pressed/carved into parchment
+   ═══════════════════════════════════════════════════════════════ */
+
+.search-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+/* Outer container — double border via ::before */
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--ink-light);
+  background: rgba(160, 120, 40, 0.06);
+}
+
+/* Inner double-border line */
+.search-bar::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 0.5px solid rgba(42, 30, 8, 0.45);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Focused: just the border darkens — no glow, no shadow, no neon */
+.search-bar--focused {
+  border-color: var(--ink);
+}
+.search-bar--focused::before {
+  border-color: rgba(26, 18, 8, 0.6);
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0.9rem 1rem 0.9rem 1.1rem;
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.search-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.65;
+  font-style: italic;
+}
+
+/* The "Seek" button — shares the parchment feel, border-left only */
+.search-btn {
+  flex-shrink: 0;
+  padding: 0.9rem 1.4rem;
+  background: rgba(120, 90, 30, 0.10);
+  border: none;
+  border-left: 1px solid var(--ink-light);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ink-light);
+  position: relative;
+  z-index: 2;
+}
+
+.search-btn:hover {
+  background: rgba(120, 90, 30, 0.18);
+  color: var(--ink);
+}
+
+/* Focus state: darken btn border too */
+.search-bar--focused .search-btn {
+  border-left-color: var(--ink);
+}
+
+.search-hint {
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.01em;
+  opacity: 0.8;
+  text-align: center;
+  text-shadow:
+    0  1px 2px rgba(255, 240, 180, 0.5),
+    0 -1px 1px rgba(60, 35, 8, 0.35);
+}
+
+.search-input,
+.search-btn {
+  text-shadow:
+    0  1px 2px rgba(255, 240, 180, 0.5),
+    0 -1px 1px rgba(60, 35, 8, 0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CINEMATIC TRANSITION — closes and reopens like a book
+   ═══════════════════════════════════════════════════════════════ */
+
+.cinematic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0a0705;   /* near-black, like a closed book's shadow */
+  pointer-events: none;
+  transition: opacity 0.65s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PARTICLE SYSTEM (ThemeEngine — AI book themes)
+   ═══════════════════════════════════════════════════════════════ */
+
+.particle-layer { position: fixed; inset: 0; z-index: 7; pointer-events: none; }
+.particle { position: absolute; pointer-events: none;
+  animation-iteration-count: infinite; animation-timing-function: ease-in-out;
+  animation-fill-mode: both; }
+.particle--drift-1 { animation-name: drift-1; }
+.particle--drift-2 { animation-name: drift-2; }
+.particle--drift-3 { animation-name: drift-3; }
+.particle--drift-4 { animation-name: drift-4; }
+.particle--drift-5 { animation-name: drift-5; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 520px) {
+  .page-content { padding: 60px 24px 80px; gap: 1.4rem; }
+  .logo-wordmark { font-size: 2.2rem; letter-spacing: 0.28em; }
+  .logo-tagline  { letter-spacing: 0.3em; }
+  .border-outer  { inset: 12px; }
+  .border-inner  { inset: 18px; }
+  .corner-orn    { width: 54px; height: 54px; }
+  .center-orn--top,
+  .center-orn--bot { display: none; }
+  .side-orn { display: none; }
+}
