@@ -3,6 +3,7 @@ from fastapi import APIRouter
 import httpx
 from app.db import get_cached_dna, save_dna
 from app.services.dna import get_categorized_candidates
+from app.services.ol import search as ol_search
 
 router = APIRouter()
 
@@ -25,20 +26,17 @@ async def _validate_candidate(
     author = candidate.get("author", "")
     reason = candidate.get("reason", "")
 
-    try:
-        resp = await client.get(
-            "https://openlibrary.org/search.json",
-            params={
-                "title": title,
-                "author": author,
-                "limit": 1,
-                "fields": "key,title,author_name,cover_i",
-            },
-        )
-        docs = resp.json().get("docs", [])
-    except Exception:
-        return None
+    docs = await ol_search(
+        {
+            "title": title,
+            "author": author,
+            "limit": 1,
+            "fields": "key,title,author_name,cover_i",
+        },
+        client=client,
+    )
 
+    # docs is None (OL unreachable, no cache) or [] (not found) — skip
     if not docs:
         return None
 
@@ -66,7 +64,7 @@ async def _validate_candidate(
 
 
 async def validate_category(candidates: list) -> list:
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient() as client:
         results = await asyncio.gather(
             *[_validate_candidate(client, c) for c in candidates]
         )
