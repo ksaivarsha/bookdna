@@ -9,8 +9,11 @@ search() returns:
 import asyncio
 import hashlib
 import json
+import logging
 import httpx
 from app.db import get_ol_cache, set_ol_cache
+
+logger = logging.getLogger(__name__)
 
 BASE = "https://openlibrary.org"
 TIMEOUT = 8.0       # seconds per attempt
@@ -43,7 +46,8 @@ async def search(
                 httpx.TimeoutException,
                 httpx.ConnectError,
                 httpx.RemoteProtocolError,
-            ):
+            ) as e:
+                logger.warning("OL search attempt %d failed: %s", attempt + 1, type(e).__name__)
                 if attempt == 1:
                     return None
                 await asyncio.sleep(RETRY_DELAY)
@@ -87,6 +91,7 @@ async def work_description(work_key: str) -> str:
             try:
                 r = await c.get(f"{BASE}{work_key}.json", timeout=TIMEOUT)
                 if r.status_code != 200:
+                    logger.warning("OL work fetch returned HTTP %d", r.status_code)
                     return ""
                 description = _extract_description(r.json())
                 set_ol_cache(key, {"description": description})
@@ -95,7 +100,8 @@ async def work_description(work_key: str) -> str:
                 httpx.TimeoutException,
                 httpx.ConnectError,
                 httpx.RemoteProtocolError,
-            ):
+            ) as e:
+                logger.warning("OL work fetch attempt %d failed: %s", attempt + 1, type(e).__name__)
                 if attempt == 1:
                     return ""
                 await asyncio.sleep(RETRY_DELAY)

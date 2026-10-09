@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import logging
 import os
 
 from app.db import init_db
@@ -9,6 +10,14 @@ from app.routes.recommendations import router as recs_router
 from app.routes.history import router as history_router
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+# httpx (and httpx2, used by the Anthropic SDK) log every request URL at INFO; keep them quiet
+for name in ("httpx", "httpx2"):
+    logging.getLogger(name).setLevel(logging.WARNING)
 
 app = FastAPI(title="BookDNA API", version="1.0.0")
 

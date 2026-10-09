@@ -1,6 +1,11 @@
 import json
+import logging
 import os
 import anthropic
+
+# Log exception type names only: messages and request details are never logged,
+# so the API key cannot end up in the logs.
+logger = logging.getLogger(__name__)
 
 MODEL = "claude-haiku-5-5"
 
@@ -25,12 +30,24 @@ _PROFILE_SCHEMA = {
 }
 
 
+_warned_no_key = False
+
+
 def _api_key() -> str:
-    return os.getenv("ANTHROPIC_API_KEY", "").strip()
+    global _warned_no_key
+    key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not key and not _warned_no_key:
+        logger.warning("ANTHROPIC_API_KEY is not set; AI features are disabled")
+        _warned_no_key = True
+    return key
 
 
-def _text(message) -> str | None:
+def _text(message, step: str) -> str | None:
+    if message.stop_reason != "end_turn":
+        logger.warning("%s: Claude stopped with stop_reason=%s", step, message.stop_reason)
     block = next((b for b in message.content if b.type == "text"), None)
+    if block is None:
+        logger.warning("%s: Claude response had no text block", step)
     return block.text if block else None
 
 
@@ -78,13 +95,14 @@ Use your own knowledge of the book if the description is thin."""
             messages=[{"role": "user", "content": prompt}],
             output_config={"format": {"type": "json_schema", "schema": _PROFILE_SCHEMA}},
         )
-        raw = _text(message)
+        raw = _text(message, "profile extraction")
         if raw is None:
             return None
         profile = json.loads(raw)
         profile["tropes"] = [t.strip().lower() for t in profile["tropes"] if t.strip()]
         return profile
-    except Exception:
+    except Exception as e:
+        logger.error("profile extraction failed: %s", type(e).__name__)
         return None
 
 
@@ -128,7 +146,7 @@ and subgenre, and "Same Vibe" should match its tone.
 For each category, provide exactly 6 real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) explaining why a fan of "{title}" would enjoy it.
 
-Return ONLY valid JSON — no markdown, no explanation, no code fences — in this exact shape:
+Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
 {{
   "Similar Storyline": [
     {{"title": "...", "author": "...", "reason": "..."}}
@@ -144,7 +162,7 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences — in th
   ]
 }}"""
 
-    return await _ask_categories(api_key, prompt)
+    return await _ask_categories(api_key, prompt, "book recommendations")
 
 
 TASTE_LABELS = [
@@ -191,7 +209,7 @@ each list best match first.
 For each category, provide exactly 6 real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) naming which of their recurring elements it matches.
 
-Return ONLY valid JSON — no markdown, no explanation, no code fences — in this exact shape:
+Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
 {{
   "{TASTE_LABELS[0]}": [
     {{"title": "...", "author": "...", "reason": "..."}}
@@ -204,25 +222,27 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences — in th
   ]
 }}"""
 
-    return await _ask_categories(api_key, prompt)
+    return await _ask_categories(api_key, prompt, "taste recommendations")
 
 
-async def _ask_categories(api_key: str, prompt: str) -> dict | None:
+async def _ask_categories(api_key: str, prompt: str, step: str) -> dict | None:
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         message = await client.messages.create(
             model=MODEL,
-            max_tokens=16000,  # room for adaptive thinking plus 18–24 books of JSON
+            max_tokens=16000,  # room for adaptive thinking plus 18â€“24 books of JSON
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = _text(message)
+        raw = _text(message, step)
         if raw is None:
             return None
         raw = raw.strip()
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start == -1 or end == 0:
+            logger.warning("%s: no JSON object in Claude response", step)
             return None
         return json.loads(raw[start:end])
-    except Exception:
+    except Exception as e:
+        logger.error("%s failed: %s", step, type(e).__name__)
         return None
