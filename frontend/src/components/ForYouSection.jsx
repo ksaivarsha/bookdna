@@ -12,7 +12,7 @@ function forYouHeadline(books) {
   return `Because you searched ${first} and ${rest}`
 }
 
-export function ForYouSection() {
+export function ForYouSection({ onSelectBook }) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -30,7 +30,7 @@ export function ForYouSection() {
       <p className="for-you-headline">
         {forYouHeadline(data.books)}
       </p>
-      <CategorySection categories={data.categories} loading={false} />
+      <CategorySection categories={data.categories} loading={false} onSelect={onSelectBook} />
     </section>
   )
 }

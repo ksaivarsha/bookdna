@@ -4,7 +4,10 @@ import os
 import time
 from contextlib import contextmanager
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "bookdna.db")
+DB_PATH = os.getenv(
+    "BOOKDNA_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "..", "bookdna.db"),
+)
 
 
 @contextmanager

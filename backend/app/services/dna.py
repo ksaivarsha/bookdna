@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import anthropic
+import jiter
 
 # Log exception type names only: messages and request details are never logged,
 # so the API key cannot end up in the logs.
@@ -43,6 +44,10 @@ def _api_key() -> str:
 
 
 def _text(message, step: str) -> str | None:
+    logger.info(
+        "usage step=%s in=%d out=%d",
+        step.replace(" ", "_"), message.usage.input_tokens, message.usage.output_tokens,
+    )
     if message.stop_reason != "end_turn":
         logger.warning("%s: Claude stopped with stop_reason=%s", step, message.stop_reason)
     block = next((b for b in message.content if b.type == "text"), None)
@@ -94,6 +99,9 @@ Use your own knowledge of the book if the description is thin."""
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
             output_config={"format": {"type": "json_schema", "schema": _PROFILE_SCHEMA}},
+            # Thinking off: profiles matched thinking-on quality in testing at
+            # under half the latency, and the DNA chips are the first AI output shown.
+            thinking={"type": "disabled"},
         )
         raw = _text(message, "profile extraction")
         if raw is None:
@@ -119,50 +127,98 @@ def _profile_block(profile: dict | None) -> str:
     )
 
 
-async def get_categorized_candidates(
-    book: dict, profile: dict | None = None
-) -> dict | None:
+_BOOK_SCHEMA = {
+    "type": "object",
+    "properties": {"title": {"type": "string"}, "author": {"type": "string"}, "reason": {"type": "string"}},
+    "required": ["title", "author", "reason"],
+    "additionalProperties": False,
+}
+
+# Shelf label -> JSON key in the recommendations response, in generation order
+SHELF_KEYS = {
+    "Similar Storyline": "similar_storyline",
+    "Similar Tropes": "similar_tropes",
+    "Similar World/Setting": "similar_world_setting",
+    "Same Vibe": "same_vibe",
+}
+
+_SHELVES_SCHEMA = {
+    "type": "object",
+    "properties": {key: {"type": "array", "items": _BOOK_SCHEMA} for key in SHELF_KEYS.values()},
+    "required": list(SHELF_KEYS.values()),
+    "additionalProperties": False,
+}
+
+
+async def _stream_fields(api_key: str, prompt: str, schema: dict, step: str):
     """
-    Ask Claude to generate categorized book recommendations for the given book,
-    grounded in its DNA profile when one is available.
-    Returns a dict keyed by category label, each value a list of
-    {title, author, reason} dicts. Returns None if no API key or any error.
+    Stream a schema-constrained JSON object and yield (key, value) for each
+    top-level field as soon as it is complete: a field is complete once the
+    next one has started, or when the message ends. Stops early on any error.
+    """
+    sent = set()
+
+    def complete(parsed: dict, done: bool):
+        keys = list(parsed)
+        for key in keys if done else keys[:-1]:
+            if key not in sent:
+                sent.add(key)
+                yield key, parsed[key]
+
+    try:
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        async with client.messages.stream(
+            model=MODEL,
+            max_tokens=16000,  # room for adaptive thinking plus 24 books of JSON
+            messages=[{"role": "user", "content": prompt}],
+            output_config={"format": {"type": "json_schema", "schema": schema}},
+        ) as stream:
+            buf = ""
+            async for chunk in stream.text_stream:
+                buf += chunk
+                parsed = jiter.from_json(buf.encode(), partial_mode="on")
+                if isinstance(parsed, dict):
+                    for field in complete(parsed, done=False):
+                        yield field
+            message = await stream.get_final_message()
+        raw = _text(message, step)
+        if raw is not None:
+            for field in complete(json.loads(raw), done=True):
+                yield field
+    except Exception as e:
+        logger.error("%s failed: %s", step, type(e).__name__)
+
+
+async def stream_recommendations(book: dict, profile: dict | None = None):
+    """
+    Ask Claude for four shelves of recommendations grounded in the book's DNA
+    profile, streaming. Yields (label, [{title, author, reason}, ...]) as each
+    shelf finishes generating. Yields nothing if there is no API key.
     """
     api_key = _api_key()
     if not api_key:
-        return None
+        return
 
     title = book.get("title", "Unknown")
-
     prompt = f"""You are a literary expert. Given the book below, recommend real existing books
-in exactly four categories. Only recommend books you are highly confident actually exist.
+in exactly four categories. Only recommend books you are highly confident actually exist,
+and never "{title}" itself.
 
 {_book_header(book, 400)}
 {_profile_block(profile)}
-Use the Book DNA to drive each category: "Similar Storyline" should match the storyline,
-"Similar Tropes" should share its tropes, "Similar World/Setting" should match its world/setting
-and subgenre, and "Same Vibe" should match its tone.
+Use the Book DNA to drive each category:
+- similar_storyline: books whose storyline resembles this one's.
+- similar_tropes: books sharing its tropes.
+- similar_world_setting: books with a similar world/setting and subgenre.
+- same_vibe: books matching its tone.
 
 For each category, provide exactly 6 real books with the exact title, the author's full name,
-and a one-line reason (under 15 words) explaining why a fan of "{title}" would enjoy it.
+and a one-line reason (under 15 words) explaining why a fan of "{title}" would enjoy it."""
 
-Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
-{{
-  "Similar Storyline": [
-    {{"title": "...", "author": "...", "reason": "..."}}
-  ],
-  "Similar Tropes": [
-    {{"title": "...", "author": "...", "reason": "..."}}
-  ],
-  "Similar World/Setting": [
-    {{"title": "...", "author": "...", "reason": "..."}}
-  ],
-  "Same Vibe": [
-    {{"title": "...", "author": "...", "reason": "..."}}
-  ]
-}}"""
-
-    return await _ask_categories(api_key, prompt, "book recommendations")
+    labels = {v: k for k, v in SHELF_KEYS.items()}
+    async for key, books in _stream_fields(api_key, prompt, _SHELVES_SCHEMA, "book recommendations"):
+        if key in labels:
+            yield labels[key], books
 
 
 TASTE_LABELS = [
@@ -209,7 +265,7 @@ each list best match first.
 For each category, provide exactly 6 real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) naming which of their recurring elements it matches.
 
-Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
+Return ONLY valid JSON — no markdown, no explanation, no code fences — in this exact shape:
 {{
   "{TASTE_LABELS[0]}": [
     {{"title": "...", "author": "...", "reason": "..."}}
@@ -230,7 +286,7 @@ async def _ask_categories(api_key: str, prompt: str, step: str) -> dict | None:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         message = await client.messages.create(
             model=MODEL,
-            max_tokens=16000,  # room for adaptive thinking plus 18â€“24 books of JSON
+            max_tokens=16000,  # room for adaptive thinking plus 18–24 books of JSON
             messages=[{"role": "user", "content": prompt}],
         )
         raw = _text(message, step)

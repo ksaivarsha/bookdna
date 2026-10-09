@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import httpx
 from app.db import get_ol_cache, set_ol_cache
 
@@ -29,6 +30,7 @@ async def search(
     params: dict,
     *,
     client: httpx.AsyncClient | None = None,
+    timeout: float = TIMEOUT,
 ) -> list | None:
     key = _key(params)
     cached = get_ol_cache(key)
@@ -39,7 +41,7 @@ async def search(
         for attempt in range(2):
             try:
                 r = await c.get(
-                    f"{BASE}/search.json", params=params, timeout=TIMEOUT
+                    f"{BASE}/search.json", params=params, timeout=timeout
                 )
                 return r.json().get("docs", [])
             except (
@@ -65,12 +67,25 @@ async def search(
     return docs
 
 
+_MD_LINK = re.compile(r"\[([^\]]+)\]\((?:[^)]+)\)|\[([^\]]+)\]\[\d+\]")
+_MD_REF = re.compile(r"^\s*\[\d+\]:\s*\S+.*$", re.MULTILINE)
+
+
+def _clean_description(text: str) -> str:
+    """Drop OL's trailing source notes and markdown link syntax, keep the prose."""
+    text = text.split("----------")[0]
+    text = _MD_REF.sub("", text)
+    text = _MD_LINK.sub(lambda m: m.group(1) or m.group(2), text)
+    text = re.sub(r"\(\s*source:?\s*[^)]*\)\s*$", "", text, flags=re.IGNORECASE)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def _extract_description(work: dict) -> str:
     # OL stores description as either a plain string or {"type": ..., "value": ...}
     desc = work.get("description", "")
     if isinstance(desc, dict):
         desc = desc.get("value", "")
-    return desc.strip() if isinstance(desc, str) else ""
+    return _clean_description(desc) if isinstance(desc, str) else ""
 
 
 async def work_description(work_key: str) -> str:
@@ -84,7 +99,7 @@ async def work_description(work_key: str) -> str:
     key = _key({"work": work_key})
     cached = get_ol_cache(key)
     if cached is not None:
-        return cached.get("description", "")
+        return _clean_description(cached.get("description", ""))  # older entries were stored raw
 
     async with httpx.AsyncClient() as c:
         for attempt in range(2):

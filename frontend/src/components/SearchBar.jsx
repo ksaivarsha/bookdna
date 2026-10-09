@@ -1,46 +1,28 @@
-import { useState } from 'react'
-import { searchBooks, addToHistory, getRecommendationsByCategory } from '../services/api'
+import { useEffect, useRef, useState } from 'react'
+import { searchBooks, addToHistory, getRelated, streamRecommendations } from '../services/api'
 import { CategorySection } from './CategorySection'
+import { FeaturedBook } from './FeaturedBook'
 
-function BookCard({ book }) {
+const SHELF_ORDER = ['Similar Storyline', 'Similar Tropes', 'Similar World/Setting', 'Same Vibe']
+const byShelfOrder = (a, b) => SHELF_ORDER.indexOf(a.label) - SHELF_ORDER.indexOf(b.label)
+
+function BookCard({ book, onSelect }) {
   return (
-    <div className="book-card-small">
+    <button type="button" className="book-card-small" onClick={() => onSelect?.(book)}
+      aria-label={`${book.title}, details`}>
       {book.cover ? (
-        <img src={book.cover} alt={book.title} className="book-card-small__cover" />
+        <img src={book.cover} alt="" className="book-card-small__cover" />
       ) : (
         <div className="book-card-small__no-cover">No cover</div>
       )}
       <div className="book-card-small__title">{book.title}</div>
       <div className="book-card-small__author">{(book.authors || []).join(', ')}</div>
-    </div>
+    </button>
   )
 }
 
-function BookDNA({ profile }) {
-  if (!profile) return null
-  const tropes = profile.tropes || []
-  return (
-    <div className="book-dna">
-      {tropes.length > 0 && (
-        <div className="book-dna__tropes">
-          {tropes.map(t => <span key={t} className="dna-chip">{t}</span>)}
-        </div>
-      )}
-      <div className="book-dna__meta">
-        {profile.world_setting && (
-          <span><span className="book-dna__label">Setting</span>{profile.world_setting}</span>
-        )}
-        {profile.world_setting && profile.tone && <span className="book-dna__sep">❧</span>}
-        {profile.tone && (
-          <span><span className="book-dna__label">Tone</span>{profile.tone}</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-export function SearchBar({ onSearch }) {
-  const [query, setQuery]           = useState('')
+export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
+  const [draft, setDraft]           = useState(activeQuery)
   const [focused, setFocused]       = useState(false)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
@@ -48,36 +30,76 @@ export function SearchBar({ onSearch }) {
   const [catLoading, setCatLoading] = useState(false)
   const [categories, setCategories] = useState(null)
   const [profile, setProfile]       = useState(null)
+  const [genrePicks, setGenrePicks] = useState([])
+  const streamRef = useRef(null)
 
-  async function handleSearch() {
-    if (!query.trim()) return
+  // The URL's ?q= drives the search: typing a search, the back button,
+  // a shared link, and the logo (which clears it) all arrive here.
+  useEffect(() => {
+    setDraft(activeQuery)
+    if (activeQuery) {
+      runSearch(activeQuery)
+    } else {
+      streamRef.current?.abort()
+      setLoading(false)
+      setError('')
+      setResults(null)
+      setCategories(null)
+      setProfile(null)
+      setGenrePicks([])
+      setCatLoading(false)
+    }
+    return () => streamRef.current?.abort()
+  }, [activeQuery])
+
+  async function runSearch(q) {
+    streamRef.current?.abort()  // drop events from a previous search
+    const controller = new AbortController()
+    streamRef.current = controller
+
     setLoading(true)
     setError('')
     setResults(null)
     setCategories(null)
     setProfile(null)
+    setGenrePicks([])
+    setCatLoading(false)
     try {
-      const data = await searchBooks(query)
+      const data = await searchBooks(q)
+      if (controller.signal.aborted) return
       setResults(data)
-      onSearch?.()
       addToHistory(data.source)
+
+      getRelated(data.source).then(picks => {
+        if (!controller.signal.aborted) setGenrePicks(picks)
+      })
+
       setCatLoading(true)
-      getRecommendationsByCategory(data.source)
-        .then(rec => {
-          if (rec.profile) setProfile(rec.profile)
-          if (!rec.fallback && rec.categories?.length) setCategories(rec.categories)
-        })
-        .catch(() => {})
-        .finally(() => setCatLoading(false))
+      streamRecommendations(data.source, event => {
+        if (controller.signal.aborted) return
+        if (event.type === 'profile') setProfile(event.profile)
+        if (event.type === 'shelf') {
+          setCategories(prev => [...(prev || []), event].sort(byShelfOrder))
+        }
+      }, controller.signal).finally(() => {
+        if (!controller.signal.aborted) setCatLoading(false)
+      })
     } catch (err) {
-      setError(err.message)
+      if (!controller.signal.aborted) setError(err.message)
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }
 
+  function handleSubmit() {
+    const q = draft.trim()
+    if (!q) return
+    if (q === activeQuery) runSearch(q)  // same URL: search again explicitly
+    else onSubmit(q)
+  }
+
   function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSearch()
+    if (e.key === 'Enter') handleSubmit()
   }
 
   return (
@@ -87,18 +109,25 @@ export function SearchBar({ onSearch }) {
           className="search-input"
           type="text"
           placeholder="Search by title, author, or genre…"
+          aria-label="Search the library"
           autoComplete="off"
           spellCheck="false"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={handleKeyDown}
         />
-        <button className="search-btn" type="button" onClick={handleSearch} disabled={loading}>
+        <button className="search-btn" type="button" onClick={handleSubmit} disabled={loading}>
           {loading ? '…' : 'Seek'}
         </button>
       </div>
+
+      {activeQuery && (results || error) && !loading && (
+        <a href="./" className="return-link" onClick={e => { e.preventDefault(); onHome() }}>
+          ← Return to the library
+        </a>
+      )}
 
       {loading && (
         <p className="search-hint"><em>Consulting the library…</em></p>
@@ -115,23 +144,19 @@ export function SearchBar({ onSearch }) {
 
       {results && !loading && (
         <div className="search-results">
-          <p className="search-results__source">
-            <em>{results.source.title}</em>
-            {results.source.authors?.[0] && <> by {results.source.authors[0]}</>}
-          </p>
-          <BookDNA profile={profile} />
+          <FeaturedBook book={results.source} profile={profile} profileLoading={catLoading} />
 
-          {/* Phase 1: genre fallback recs (always shown until category recs replace them) */}
-          {!categories && results.recommendations.length > 0 && (
+          {/* Phase 1: genre picks, shown until the first AI shelf arrives (and kept if none do) */}
+          {!categories && genrePicks.length > 0 && (
             <div className="genre-recs">
-              {results.recommendations.map(book => (
-                <BookCard key={book.id} book={book} />
+              {genrePicks.map(book => (
+                <BookCard key={book.id} book={book} onSelect={onSelectBook} />
               ))}
             </div>
           )}
 
           {/* Phase 2: categorized recs */}
-          <CategorySection categories={categories} loading={catLoading} />
+          <CategorySection categories={categories} loading={catLoading} onSelect={onSelectBook} />
         </div>
       )}
     </section>
