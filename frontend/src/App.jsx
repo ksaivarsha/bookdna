@@ -27,6 +27,13 @@ function BookPage() {
   }, [])
 
   const scrollRef = useRef(null)
+
+  // Every change of page (a new search, the logo, Return, back/forward) starts
+  // at the top of the page's scroll container, so the search bar is in view.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [query])
+
   const [selectedBook, setSelectedBook] = useState(null)
   const closePanel = useCallback(() => setSelectedBook(null), [])
 
@@ -40,7 +47,6 @@ function BookPage() {
     const url = q ? `?q=${encodeURIComponent(q)}` : window.location.pathname
     window.history.pushState(null, '', url)
     setQuery(q)
-    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -55,14 +61,15 @@ function BookPage() {
         <Logo onHome={() => navigate('')} />
         <DividerOrnament />
 
-        {!query && <ForYouSection onSelectBook={setSelectedBook} />}
-
+        {/* Always rendered, and first after the logo so it is in view on the homepage */}
         <SearchBar
           activeQuery={query}
           onSubmit={navigate}
           onHome={() => navigate('')}
           onSelectBook={setSelectedBook}
         />
+
+        {!query && <ForYouSection onSelectBook={setSelectedBook} />}
 
         <DividerOrnament variant="tail" />
       </main>
