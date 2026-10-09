@@ -724,6 +724,66 @@
 
 .shelf { position: relative; }
 
+/* Placeholder shelves: empty book outlines, like blank plates awaiting their engravings */
+.category-section__status { margin-bottom: 0.9rem; }
+
+.category-group--pending .category-label { opacity: 0.55; }
+.category-group--pending .category-books { overflow: hidden; }
+
+.placeholder-card {
+  flex-shrink: 0;
+  width: 100px;
+  padding: 4px 2px;
+  animation: candle-flicker 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.22s);
+}
+
+.placeholder-card__cover {
+  position: relative;
+  width: 86px;
+  height: 120px;
+  margin: 0 auto 7px;
+  border: 0.5px solid rgba(42, 30, 8, 0.45);
+  background: rgba(212, 190, 132, 0.28);
+}
+/* inner rule and a faint spine, as on a blank cloth binding */
+.placeholder-card__cover::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 0.5px solid rgba(122, 80, 16, 0.35);
+}
+.placeholder-card__cover::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 12px;
+  border-left: 0.5px solid rgba(122, 80, 16, 0.25);
+}
+
+.placeholder-card__line {
+  width: 70%;
+  height: 6px;
+  margin: 0 auto 5px;
+  border-radius: 1px;
+  background: rgba(42, 30, 8, 0.12);
+}
+.placeholder-card__line--short { width: 45%; }
+
+@keyframes candle-flicker {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.95; }
+}
+
+.category-group--arrived { animation: shelf-in 0.45s ease; }
+@keyframes shelf-in { from { opacity: 0; transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .placeholder-card, .category-group--arrived { animation: none; }
+  .placeholder-card { opacity: 0.75; }
+}
+
 /* ‹ › page-turn buttons: small inked roundels over the covers */
 .shelf__arrow {
   position: absolute;

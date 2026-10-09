@@ -142,15 +142,26 @@ SHELF_KEYS = {
     "Same Vibe": "same_vibe",
 }
 
-_SHELVES_SCHEMA = {
-    "type": "object",
-    "properties": {key: {"type": "array", "items": _BOOK_SCHEMA} for key in SHELF_KEYS.values()},
-    "required": list(SHELF_KEYS.values()),
-    "additionalProperties": False,
+_SHELF_GUIDE = {
+    "similar_storyline": "books whose storyline resembles this one's.",
+    "similar_tropes": "books sharing its tropes.",
+    "similar_world_setting": "books with a similar world/setting and subgenre.",
+    "same_vibe": "books matching its tone.",
 }
 
 
-async def _stream_fields(api_key: str, prompt: str, schema: dict, step: str):
+def _shelves_schema(keys: list[str]) -> dict:
+    return {
+        "type": "object",
+        "properties": {key: {"type": "array", "items": _BOOK_SCHEMA} for key in keys},
+        "required": keys,
+        "additionalProperties": False,
+    }
+
+
+async def _stream_fields(
+    api_key: str, prompt: str, schema: dict, step: str, effort: str | None = None
+):
     """
     Stream a schema-constrained JSON object and yield (key, value) for each
     top-level field as soon as it is complete: a field is complete once the
@@ -165,13 +176,17 @@ async def _stream_fields(api_key: str, prompt: str, schema: dict, step: str):
                 sent.add(key)
                 yield key, parsed[key]
 
+    output_config = {"format": {"type": "json_schema", "schema": schema}}
+    if effort:
+        output_config["effort"] = effort
+
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         async with client.messages.stream(
             model=MODEL,
             max_tokens=16000,  # room for adaptive thinking plus 24 books of JSON
             messages=[{"role": "user", "content": prompt}],
-            output_config={"format": {"type": "json_schema", "schema": schema}},
+            output_config=output_config,
         ) as stream:
             buf = ""
             async for chunk in stream.text_stream:
@@ -189,36 +204,58 @@ async def _stream_fields(api_key: str, prompt: str, schema: dict, step: str):
         logger.error("%s failed: %s", step, type(e).__name__)
 
 
-async def stream_recommendations(book: dict, profile: dict | None = None):
+async def stream_recommendations(
+    book: dict,
+    profile: dict | None = None,
+    *,
+    shelves: list[str] | None = None,
+    per_shelf: int = 6,
+    effort: str | None = None,
+):
     """
-    Ask Claude for four shelves of recommendations grounded in the book's DNA
-    profile, streaming. Yields (label, [{title, author, reason}, ...]) as each
-    shelf finishes generating. Yields nothing if there is no API key.
+    Ask Claude for shelves of recommendations (all four by default, or just the
+    given labels), grounded in the book's DNA profile when one is passed.
+    Streams, yielding (label, [{title, author, reason}, ...]) as each shelf
+    finishes generating. Yields nothing if there is no API key.
     """
     api_key = _api_key()
     if not api_key:
         return
 
+    labels = shelves or list(SHELF_KEYS)
+    keys = [SHELF_KEYS[label] for label in labels]
     title = book.get("title", "Unknown")
+    count = "exactly one category" if len(keys) == 1 else f"exactly {len(keys)} categories"
+    drive = "Use the Book DNA to drive each category:" if profile else "Base each category on the book above:"
+    guide = "\n".join(f"- {key}: {_SHELF_GUIDE[key]}" for key in keys)
+    others = [key for key in SHELF_KEYS.values() if key not in keys]
+    if others:
+        # Shelves generated separately can't see each other's picks; steer each
+        # toward its own theme so they overlap less.
+        guide += (
+            "\n\nOther shelves, written separately, cover: "
+            + "; ".join(f"{key} ({_SHELF_GUIDE[key][:-1]})" for key in others)
+            + ". Choose books whose strongest connection to this book is this category's theme,"
+            " and avoid the obvious read-alikes that would fit every shelf."
+        )
+
     prompt = f"""You are a literary expert. Given the book below, recommend real existing books
-in exactly four categories. Only recommend books you are highly confident actually exist,
+in {count}. Only recommend books you are highly confident actually exist,
 and never "{title}" itself.
 
 {_book_header(book, 400)}
 {_profile_block(profile)}
-Use the Book DNA to drive each category:
-- similar_storyline: books whose storyline resembles this one's.
-- similar_tropes: books sharing its tropes.
-- similar_world_setting: books with a similar world/setting and subgenre.
-- same_vibe: books matching its tone.
+{drive}
+{guide}
 
-For each category, provide exactly 6 real books with the exact title, the author's full name,
+For each category, provide exactly {per_shelf} real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) explaining why a fan of "{title}" would enjoy it."""
 
-    labels = {v: k for k, v in SHELF_KEYS.items()}
-    async for key, books in _stream_fields(api_key, prompt, _SHELVES_SCHEMA, "book recommendations"):
-        if key in labels:
-            yield labels[key], books
+    by_key = dict(zip(keys, labels))
+    step = "book recommendations" if len(keys) > 1 else f"shelf {keys[0]}"
+    async for key, books in _stream_fields(api_key, prompt, _shelves_schema(keys), step, effort):
+        if key in by_key:
+            yield by_key[key], books
 
 
 TASTE_LABELS = [

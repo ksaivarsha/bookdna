@@ -63,25 +63,61 @@ function Shelf({ label, children }) {
   )
 }
 
-export function CategorySection({ categories, loading, onSelect }) {
+const PLACEHOLDER_BOOKS = 5
+
+// An empty shelf of book outlines shown while that shelf is still being written
+function PlaceholderShelf({ label }) {
+  return (
+    <div className="category-group category-group--pending" aria-hidden="true">
+      <h3 className="category-label">{label}</h3>
+      <div className="category-books">
+        {Array.from({ length: PLACEHOLDER_BOOKS }, (_, i) => (
+          <div key={i} className="placeholder-card" style={{ '--i': i }}>
+            <div className="placeholder-card__cover" />
+            <div className="placeholder-card__line" />
+            <div className="placeholder-card__line placeholder-card__line--short" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Shelves of recommendations. While `loading`, every label in `expectedLabels`
+ * that hasn't arrived yet is held open by a placeholder shelf, so each real
+ * shelf drops into its own place as it arrives.
+ */
+export function CategorySection({ categories, loading, onSelect, expectedLabels = [] }) {
   const shelves = categories || []
   if (!loading && shelves.length === 0) return null
 
+  const byLabel = new Map(shelves.map(cat => [cat.label, cat]))
+  const order = loading
+    ? [...expectedLabels, ...shelves.map(cat => cat.label).filter(l => !expectedLabels.includes(l))]
+    : shelves.map(cat => cat.label)
+
   return (
-    <div className="category-section">
-      {shelves.map(cat => (
-        <div key={cat.label} className="category-group">
-          <h3 className="category-label">{cat.label}</h3>
-          <Shelf label={cat.label}>
-            {cat.books.map(book => (
-              <RecCard key={book.id || book.title} book={book} onSelect={onSelect} />
-            ))}
-          </Shelf>
-        </div>
-      ))}
+    <div className="category-section" aria-busy={loading}>
       {loading && (
-        <p className="search-hint"><em>Consulting the deeper stacks…</em></p>
+        <p className="search-hint category-section__status" role="status">
+          <em>Consulting the deeper stacks…</em>
+        </p>
       )}
+      {order.map(label => {
+        const cat = byLabel.get(label)
+        if (!cat) return <PlaceholderShelf key={label} label={label} />
+        return (
+          <div key={label} className="category-group category-group--arrived">
+            <h3 className="category-label">{label}</h3>
+            <Shelf label={label}>
+              {cat.books.map(book => (
+                <RecCard key={book.id || book.title} book={book} onSelect={onSelect} />
+              ))}
+            </Shelf>
+          </div>
+        )
+      })}
     </div>
   )
 }
