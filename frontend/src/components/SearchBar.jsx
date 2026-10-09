@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { searchBooks, addToHistory, getRelated, streamRecommendations } from '../services/api'
 import { CategorySection } from './CategorySection'
 
@@ -42,8 +42,8 @@ function BookDNA({ profile }) {
   )
 }
 
-export function SearchBar({ onSearch }) {
-  const [query, setQuery]           = useState('')
+export function SearchBar({ activeQuery, onSubmit, onHome }) {
+  const [draft, setDraft]           = useState(activeQuery)
   const [focused, setFocused]       = useState(false)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
@@ -54,8 +54,26 @@ export function SearchBar({ onSearch }) {
   const [genrePicks, setGenrePicks] = useState([])
   const streamRef = useRef(null)
 
-  async function handleSearch() {
-    if (!query.trim()) return
+  // The URL's ?q= drives the search: typing a search, the back button,
+  // a shared link, and the logo (which clears it) all arrive here.
+  useEffect(() => {
+    setDraft(activeQuery)
+    if (activeQuery) {
+      runSearch(activeQuery)
+    } else {
+      streamRef.current?.abort()
+      setLoading(false)
+      setError('')
+      setResults(null)
+      setCategories(null)
+      setProfile(null)
+      setGenrePicks([])
+      setCatLoading(false)
+    }
+    return () => streamRef.current?.abort()
+  }, [activeQuery])
+
+  async function runSearch(q) {
     streamRef.current?.abort()  // drop events from a previous search
     const controller = new AbortController()
     streamRef.current = controller
@@ -66,10 +84,11 @@ export function SearchBar({ onSearch }) {
     setCategories(null)
     setProfile(null)
     setGenrePicks([])
+    setCatLoading(false)
     try {
-      const data = await searchBooks(query)
+      const data = await searchBooks(q)
+      if (controller.signal.aborted) return
       setResults(data)
-      onSearch?.()
       addToHistory(data.source)
 
       getRelated(data.source).then(picks => {
@@ -87,14 +106,21 @@ export function SearchBar({ onSearch }) {
         if (!controller.signal.aborted) setCatLoading(false)
       })
     } catch (err) {
-      setError(err.message)
+      if (!controller.signal.aborted) setError(err.message)
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
   }
 
+  function handleSubmit() {
+    const q = draft.trim()
+    if (!q) return
+    if (q === activeQuery) runSearch(q)  // same URL: search again explicitly
+    else onSubmit(q)
+  }
+
   function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSearch()
+    if (e.key === 'Enter') handleSubmit()
   }
 
   return (
@@ -104,18 +130,25 @@ export function SearchBar({ onSearch }) {
           className="search-input"
           type="text"
           placeholder="Search by title, author, or genre…"
+          aria-label="Search the library"
           autoComplete="off"
           spellCheck="false"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={handleKeyDown}
         />
-        <button className="search-btn" type="button" onClick={handleSearch} disabled={loading}>
+        <button className="search-btn" type="button" onClick={handleSubmit} disabled={loading}>
           {loading ? '…' : 'Seek'}
         </button>
       </div>
+
+      {activeQuery && (results || error) && !loading && (
+        <a href="./" className="return-link" onClick={e => { e.preventDefault(); onHome() }}>
+          ← Return to the library
+        </a>
+      )}
 
       {loading && (
         <p className="search-hint"><em>Consulting the library…</em></p>
