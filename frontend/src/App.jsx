@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './index.css'
 import './App.css'
 import { ThemeProvider }        from './contexts/ThemeContext'
@@ -26,6 +26,7 @@ function BookPage() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
+  const scrollRef = useRef(null)
   const [selectedBook, setSelectedBook] = useState(null)
   const closePanel = useCallback(() => setSelectedBook(null), [])
 
@@ -39,7 +40,7 @@ function BookPage() {
     const url = q ? `?q=${encodeURIComponent(q)}` : window.location.pathname
     window.history.pushState(null, '', url)
     setQuery(q)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -47,6 +48,7 @@ function BookPage() {
       <BackgroundLayer />
       <PageBorder />
 
+      <div className="page-scroll" ref={scrollRef}>
       <main className="page-content">
         <Frieze />
         <DividerOrnament />
@@ -64,6 +66,7 @@ function BookPage() {
 
         <DividerOrnament variant="tail" />
       </main>
+      </div>
 
       {selectedBook && (
         <BookDetailPanel book={selectedBook} onClose={closePanel} onSeek={seekBook} />

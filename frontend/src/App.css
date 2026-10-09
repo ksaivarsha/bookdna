@@ -140,13 +140,27 @@
    PAGE CONTENT LAYOUT
    ═══════════════════════════════════════════════════════════════ */
 
+/* The page scrolls inside the inner border, like reading through a window in
+   the frame: content fades out at the rules instead of sliding under them. */
+.page-scroll {
+  position: fixed;
+  inset: 27px;
+  z-index: 10;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #8a6030 transparent;
+  -webkit-mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
+          mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
+}
+
 .page-content {
   position: relative;
   z-index: 10;
-  min-height: 100vh;
+  min-height: 100%;
   max-width: 600px;
   margin: 0 auto;
-  padding: 70px 40px 90px;
+  padding: 43px 40px 63px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -700,6 +714,43 @@
   scrollbar-color: #8a6030 var(--parchment-d);
 }
 
+/* Edge fades hint that the shelf continues; only on the side with more books */
+.category-books--fade-left  { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px); mask-image: linear-gradient(to right, transparent, #000 36px); }
+.category-books--fade-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 36px); mask-image: linear-gradient(to left, transparent, #000 36px); }
+.category-books--fade-left.category-books--fade-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+          mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+.shelf { position: relative; }
+
+/* ‹ › page-turn buttons: small inked roundels over the covers */
+.shelf__arrow {
+  position: absolute;
+  top: 46px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 3px;
+  border: 0.5px solid var(--ink-gold);
+  border-radius: 50%;
+  background: rgba(240, 225, 180, 0.92);
+  box-shadow: 0 1px 4px rgba(40, 25, 5, 0.3);
+  font-family: var(--font);
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--ink-light);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.shelf__arrow--left  { left: -14px; }
+.shelf__arrow--right { right: -14px; }
+.shelf__arrow:hover  { background: var(--parchment-d); color: var(--ink); }
+.shelf__arrow:focus-visible { outline: 1px solid var(--ink-gold); outline-offset: 2px; }
+
 .category-books::-webkit-scrollbar { height: 4px; }
 .category-books::-webkit-scrollbar-track { background: var(--parchment-d); }
 .category-books::-webkit-scrollbar-thumb { background: #8a6030; }
@@ -766,7 +817,7 @@
   font-size: 0.68rem;
   line-height: 1.25;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;  /* full reason lives in the detail panel */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -954,7 +1005,8 @@ button.book-card-small:focus-visible {
    ═══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 520px) {
-  .page-content { padding: 60px 24px 80px; gap: 1.4rem; }
+  .page-scroll  { inset: 19px; }
+  .page-content { padding: 41px 24px 61px; gap: 1.4rem; }
   .logo-wordmark { font-size: 2.2rem; letter-spacing: 0.28em; }
   .logo-tagline  { letter-spacing: 0.3em; }
   .border-outer  { inset: 12px; }
