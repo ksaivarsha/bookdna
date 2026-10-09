@@ -24,7 +24,8 @@ import time
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REAL_DB = os.path.normcase(os.path.realpath(os.path.join(BACKEND, "..", "bookdna.db")))
 
-# Romantasy and fantasy favorites; "title author" makes the Open Library match reliable.
+# Romantasy and fantasy favorites. Most entries add the author to pin the match; a few use
+# the plain title so they resolve to the same work a reader's search does.
 POPULAR_BOOKS = [
     "Fourth Wing Rebecca Yarros",
     "Iron Flame Rebecca Yarros",
@@ -43,7 +44,7 @@ POPULAR_BOOKS = [
     "The Starless Sea Erin Morgenstern",
     "Caraval Stephanie Garber",
     "Once Upon a Broken Heart Stephanie Garber",
-    "Serpent & Dove Shelby Mahurin",
+    "Serpent and Dove",  # with the author it matches a boxed set
     "From Blood and Ash Jennifer L. Armentrout",
     "Kingdom of the Wicked Kerri Maniscalco",
     "The Invisible Life of Addie LaRue V. E. Schwab",
@@ -67,9 +68,9 @@ POPULAR_BOOKS = [
     "Daughter of Smoke and Bone Laini Taylor",
     "Strange the Dreamer Laini Taylor",
     "Piranesi Susanna Clarke",
-    "Mexican Gothic Silvia Moreno-Garcia",
+    "Mexican Gothic",  # Open Library spells the author Moreno-García
     "The House in the Cerulean Sea TJ Klune",
-    "Legends & Lattes Travis Baldree",
+    "Legends & Lattes",  # with the author it matches a two-book omnibus
     "Emily Wilde's Encyclopaedia of Faeries Heather Fawcett",
     "The Atlas Six Olivie Blake",
     "A Curse So Dark and Lonely Brigid Kemmerer",
