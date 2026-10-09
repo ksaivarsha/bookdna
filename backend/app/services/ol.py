@@ -29,6 +29,7 @@ async def search(
     params: dict,
     *,
     client: httpx.AsyncClient | None = None,
+    timeout: float = TIMEOUT,
 ) -> list | None:
     key = _key(params)
     cached = get_ol_cache(key)
@@ -39,7 +40,7 @@ async def search(
         for attempt in range(2):
             try:
                 r = await c.get(
-                    f"{BASE}/search.json", params=params, timeout=TIMEOUT
+                    f"{BASE}/search.json", params=params, timeout=timeout
                 )
                 return r.json().get("docs", [])
             except (

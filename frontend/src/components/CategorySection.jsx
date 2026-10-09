@@ -16,19 +16,12 @@ function RecCard({ book }) {
 }
 
 export function CategorySection({ categories, loading }) {
-  if (loading) {
-    return (
-      <div className="category-section">
-        <p className="search-hint"><em>Consulting the deeper stacks…</em></p>
-      </div>
-    )
-  }
-
-  if (!categories || categories.length === 0) return null
+  const shelves = categories || []
+  if (!loading && shelves.length === 0) return null
 
   return (
     <div className="category-section">
-      {categories.map(cat => (
+      {shelves.map(cat => (
         <div key={cat.label} className="category-group">
           <h3 className="category-label">{cat.label}</h3>
           <div className="category-books">
@@ -38,6 +31,9 @@ export function CategorySection({ categories, loading }) {
           </div>
         </div>
       ))}
+      {loading && (
+        <p className="search-hint"><em>Consulting the deeper stacks…</em></p>
+      )}
     </div>
   )
 }

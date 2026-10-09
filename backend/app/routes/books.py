@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import APIRouter, HTTPException
 from app.services.ol import search as ol_search, work_description
 from app.timing import stage
@@ -50,28 +49,32 @@ async def search_books(q: str):
         raise HTTPException(status_code=404, detail="Book not found")
 
     source_doc = docs[0]
+    with stage("description"):
+        description = await work_description(source_doc.get("key", ""))
+    return {"source": format_book(source_doc, description)}
 
-    subjects = source_doc.get("subject", [])
-    authors = source_doc.get("author_name", [])
-    related_q = subjects[0] if subjects else (authors[0] if authors else q.strip())
 
-    async def timed_description():
-        with stage("description"):
-            return await work_description(source_doc.get("key", ""))
+@router.post("/related")
+async def related_books(book: dict):
+    """
+    Genre picks for the search page: an Open Library search on the book's first
+    subject (or first author, or title). Fetched separately from /search so the
+    featured book can render without waiting for it.
+    """
+    subjects = book.get("categories") or []
+    authors = book.get("authors") or []
+    related_q = subjects[0] if subjects else (authors[0] if authors else book.get("title", ""))
+    if not related_q:
+        return {"recommendations": []}
 
-    async def timed_related():
-        with stage("ol_related"):
-            return await ol_search({"q": related_q, "limit": 10, "fields": _FIELDS})
-
-    description, related_docs = await asyncio.gather(timed_description(), timed_related())
-    source_book = format_book(source_doc, description)
+    with stage("ol_related"):
+        related_docs = await ol_search({"q": related_q, "limit": 10, "fields": _FIELDS})
     if related_docs is None:
-        related_docs = []  # OL down for related — return source with empty recs
+        related_docs = []  # OL down: no genre picks rather than an error
 
     recommendations = [
         format_book(doc)
         for doc in related_docs
-        if doc.get("key") != source_doc.get("key")
+        if doc.get("key") != book.get("id")
     ][:6]
-
-    return {"source": source_book, "recommendations": recommendations}
+    return {"recommendations": recommendations}

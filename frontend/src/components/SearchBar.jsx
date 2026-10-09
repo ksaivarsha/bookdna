@@ -1,6 +1,9 @@
-import { useState } from 'react'
-import { searchBooks, addToHistory, getRecommendationsByCategory } from '../services/api'
+import { useRef, useState } from 'react'
+import { searchBooks, addToHistory, getRelated, streamRecommendations } from '../services/api'
 import { CategorySection } from './CategorySection'
+
+const SHELF_ORDER = ['Similar Storyline', 'Similar Tropes', 'Similar World/Setting', 'Same Vibe']
+const byShelfOrder = (a, b) => SHELF_ORDER.indexOf(a.label) - SHELF_ORDER.indexOf(b.label)
 
 function BookCard({ book }) {
   return (
@@ -48,27 +51,41 @@ export function SearchBar({ onSearch }) {
   const [catLoading, setCatLoading] = useState(false)
   const [categories, setCategories] = useState(null)
   const [profile, setProfile]       = useState(null)
+  const [genrePicks, setGenrePicks] = useState([])
+  const streamRef = useRef(null)
 
   async function handleSearch() {
     if (!query.trim()) return
+    streamRef.current?.abort()  // drop events from a previous search
+    const controller = new AbortController()
+    streamRef.current = controller
+
     setLoading(true)
     setError('')
     setResults(null)
     setCategories(null)
     setProfile(null)
+    setGenrePicks([])
     try {
       const data = await searchBooks(query)
       setResults(data)
       onSearch?.()
       addToHistory(data.source)
+
+      getRelated(data.source).then(picks => {
+        if (!controller.signal.aborted) setGenrePicks(picks)
+      })
+
       setCatLoading(true)
-      getRecommendationsByCategory(data.source)
-        .then(rec => {
-          if (rec.profile) setProfile(rec.profile)
-          if (!rec.fallback && rec.categories?.length) setCategories(rec.categories)
-        })
-        .catch(() => {})
-        .finally(() => setCatLoading(false))
+      streamRecommendations(data.source, event => {
+        if (controller.signal.aborted) return
+        if (event.type === 'profile') setProfile(event.profile)
+        if (event.type === 'shelf') {
+          setCategories(prev => [...(prev || []), event].sort(byShelfOrder))
+        }
+      }, controller.signal).finally(() => {
+        if (!controller.signal.aborted) setCatLoading(false)
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -121,10 +138,10 @@ export function SearchBar({ onSearch }) {
           </p>
           <BookDNA profile={profile} />
 
-          {/* Phase 1: genre fallback recs (always shown until category recs replace them) */}
-          {!categories && results.recommendations.length > 0 && (
+          {/* Phase 1: genre picks, shown until the first AI shelf arrives (and kept if none do) */}
+          {!categories && genrePicks.length > 0 && (
             <div className="genre-recs">
-              {results.recommendations.map(book => (
+              {genrePicks.map(book => (
                 <BookCard key={book.id} book={book} />
               ))}
             </div>
