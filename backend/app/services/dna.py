@@ -146,7 +146,7 @@ and subgenre, and "Same Vibe" should match its tone.
 For each category, provide exactly 6 real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) explaining why a fan of "{title}" would enjoy it.
 
-Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
+Return ONLY valid JSON — no markdown, no explanation, no code fences — in this exact shape:
 {{
   "Similar Storyline": [
     {{"title": "...", "author": "...", "reason": "..."}}
@@ -209,7 +209,7 @@ each list best match first.
 For each category, provide exactly 6 real books with the exact title, the author's full name,
 and a one-line reason (under 15 words) naming which of their recurring elements it matches.
 
-Return ONLY valid JSON â€” no markdown, no explanation, no code fences â€” in this exact shape:
+Return ONLY valid JSON — no markdown, no explanation, no code fences — in this exact shape:
 {{
   "{TASTE_LABELS[0]}": [
     {{"title": "...", "author": "...", "reason": "..."}}
@@ -230,7 +230,7 @@ async def _ask_categories(api_key: str, prompt: str, step: str) -> dict | None:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         message = await client.messages.create(
             model=MODEL,
-            max_tokens=16000,  # room for adaptive thinking plus 18â€“24 books of JSON
+            max_tokens=16000,  # room for adaptive thinking plus 18–24 books of JSON
             messages=[{"role": "user", "content": prompt}],
         )
         raw = _text(message, step)
