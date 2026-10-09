@@ -178,6 +178,7 @@ The app opens at **http://localhost:5173**.
 
 1. **Normalized settings:** have Claude pick each book's world setting from a fixed list instead of writing free text, so For You can count settings across books the way it already counts tropes and subgenres.
 2. **Reading list:** bookmark books to a personal list. The session infrastructure is already in place.
+3. **Fuller shelves after de-duplication:** run the three-shelf call after the *Similar Storyline* shelf instead of beside it, so its prompt can exclude the storyline picks by name. Today the two calls sometimes choose the same classics, and de-duplication can leave the *Similar Tropes* shelf with only 3–4 books.
 
 ---
 
