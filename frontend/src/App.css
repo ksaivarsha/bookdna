@@ -451,19 +451,131 @@
   font-size: 0.95rem;
 }
 
+/* Featured book: a framed plate with a double rule, like a frontispiece */
+.featured-book {
+  position: relative;
+  display: flex;
+  gap: 1.4rem;
+  align-items: flex-start;
+  margin: 0.4rem 0 1.6rem;
+  padding: 1.2rem 1.3rem;
+  border: 1px solid var(--ink-light);
+  background: rgba(240, 225, 180, 0.35);
+}
+.featured-book::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 0.5px solid var(--ink-light);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.featured-book__cover {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 180px;
+  object-fit: cover;
+  border: 0.5px solid var(--ink-light);
+  box-shadow: 2px 3px 8px rgba(40, 25, 5, 0.35);
+}
+
+/* Missing cover: a blank title page with the title set in italics */
+.cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem;
+  text-align: center;
+  background: var(--parchment-d);
+  color: var(--ink-muted);
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  outline: 0.5px solid var(--ink-gold);
+  outline-offset: -6px;
+}
+
+.featured-book__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.featured-book__title {
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: 1.45rem;
+  line-height: 1.15;
+  color: var(--ink);
+  margin-bottom: 0.2rem;
+}
+
+.featured-book__byline {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  font-variant: small-caps;
+  color: var(--ink-muted);
+  margin-bottom: 0.7rem;
+}
+
+.featured-book__description {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink-light);
+  margin-bottom: 0.9rem;
+}
+.featured-book__description p { white-space: pre-line; }
+.featured-book__description p::first-letter {
+  float: left;
+  font-size: 2.6em;
+  line-height: 0.85;
+  padding: 0.05em 0.08em 0 0;
+  color: var(--ink-gold);
+  font-weight: 600;
+}
+.featured-book__description--empty { color: var(--ink-muted); }
+.featured-book__description--empty::first-letter { all: unset; }
+
+.read-more {
+  margin-top: 0.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--ink-gold);
+  cursor: pointer;
+  border-bottom: 0.5px solid currentColor;
+}
+.read-more:hover { color: var(--ink); }
+.read-more:focus-visible { outline: 1px solid var(--ink-gold); outline-offset: 3px; }
+
+.book-dna__pending {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  opacity: 0.8;
+}
+
+@media (max-width: 560px) {
+  .featured-book { flex-direction: column; align-items: center; text-align: center; }
+  .featured-book__body .book-dna__tropes { justify-content: center; }
+}
+
 /* Searched book's DNA: trope chips + setting and tone */
 .book-dna {
-  text-align: center;
-  margin: -0.4rem auto 1.2rem;
-  max-width: 34rem;
+  padding-top: 0.7rem;
+  border-top: 0.5px solid rgba(42, 30, 8, 0.25);
 }
 
 .book-dna__tropes {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 6px;
-  margin-bottom: 0.55rem;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  list-style: none;
 }
 
 .dna-chip {

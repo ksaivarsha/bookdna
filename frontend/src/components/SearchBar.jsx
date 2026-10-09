@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { searchBooks, addToHistory, getRelated, streamRecommendations } from '../services/api'
 import { CategorySection } from './CategorySection'
+import { FeaturedBook } from './FeaturedBook'
 
 const SHELF_ORDER = ['Similar Storyline', 'Similar Tropes', 'Similar World/Setting', 'Same Vibe']
 const byShelfOrder = (a, b) => SHELF_ORDER.indexOf(a.label) - SHELF_ORDER.indexOf(b.label)
@@ -15,29 +16,6 @@ function BookCard({ book }) {
       )}
       <div className="book-card-small__title">{book.title}</div>
       <div className="book-card-small__author">{(book.authors || []).join(', ')}</div>
-    </div>
-  )
-}
-
-function BookDNA({ profile }) {
-  if (!profile) return null
-  const tropes = profile.tropes || []
-  return (
-    <div className="book-dna">
-      {tropes.length > 0 && (
-        <div className="book-dna__tropes">
-          {tropes.map(t => <span key={t} className="dna-chip">{t}</span>)}
-        </div>
-      )}
-      <div className="book-dna__meta">
-        {profile.world_setting && (
-          <span><span className="book-dna__label">Setting</span>{profile.world_setting}</span>
-        )}
-        {profile.world_setting && profile.tone && <span className="book-dna__sep">❧</span>}
-        {profile.tone && (
-          <span><span className="book-dna__label">Tone</span>{profile.tone}</span>
-        )}
-      </div>
     </div>
   )
 }
@@ -165,11 +143,7 @@ export function SearchBar({ activeQuery, onSubmit, onHome }) {
 
       {results && !loading && (
         <div className="search-results">
-          <p className="search-results__source">
-            <em>{results.source.title}</em>
-            {results.source.authors?.[0] && <> by {results.source.authors[0]}</>}
-          </p>
-          <BookDNA profile={profile} />
+          <FeaturedBook book={results.source} profile={profile} profileLoading={catLoading} />
 
           {/* Phase 1: genre picks, shown until the first AI shelf arrives (and kept if none do) */}
           {!categories && genrePicks.length > 0 && (
