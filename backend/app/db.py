@@ -43,6 +43,13 @@ def init_db():
             "ON search_history(session_id, searched_at)"
         )
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS book_profile (
+                book_id TEXT PRIMARY KEY,
+                profile_json TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ol_cache (
                 cache_key TEXT PRIMARY KEY,
                 docs_json TEXT NOT NULL,
@@ -64,6 +71,22 @@ def save_dna(book_id: str, dna: dict):
         conn.execute(
             "INSERT OR REPLACE INTO dna_cache (book_id, dna_json) VALUES (?, ?)",
             (book_id, json.dumps(dna)),
+        )
+
+
+def get_profile(book_id: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT profile_json FROM book_profile WHERE book_id = ?", (book_id,)
+        ).fetchone()
+        return json.loads(row["profile_json"]) if row else None
+
+
+def save_profile(book_id: str, profile: dict):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO book_profile (book_id, profile_json) VALUES (?, ?)",
+            (book_id, json.dumps(profile)),
         )
 
 

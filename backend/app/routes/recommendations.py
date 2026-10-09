@@ -1,8 +1,8 @@
 import asyncio
 from fastapi import APIRouter
 import httpx
-from app.db import get_cached_dna, save_dna
-from app.services.dna import get_categorized_candidates
+from app.db import get_cached_dna, save_dna, get_profile, save_profile
+from app.services.dna import extract_profile, get_categorized_candidates
 from app.services.ol import search as ol_search
 
 router = APIRouter()
@@ -71,20 +71,39 @@ async def validate_category(candidates: list) -> list:
     return [r for r in results if r][:6]
 
 
+async def ensure_profile(book: dict) -> tuple[dict | None, bool]:
+    """
+    Return (profile, newly_created). Uses the book_profile table first,
+    otherwise asks Claude and stores the result.
+    """
+    book_id = book.get("id", "")
+    profile = get_profile(book_id) if book_id else None
+    if profile is not None:
+        return profile, False
+    profile = await extract_profile(book)
+    if profile and book_id:
+        save_profile(book_id, profile)
+    return profile, profile is not None
+
+
 @router.post("/by-category")
 async def recommendations_by_category(book: dict):
     book_id = book.get("id", "")
 
-    cached = get_cached_dna(book_id) if book_id else None
+    profile, new_profile = await ensure_profile(book)
+
+    # Cached recommendations predating this book's profile were generated
+    # without it, so regenerate them when the profile is new.
+    cached = get_cached_dna(book_id) if book_id and not new_profile else None
     if cached is None:
-        raw = await get_categorized_candidates(book)
+        raw = await get_categorized_candidates(book, profile)
         if raw and book_id:
             save_dna(book_id, raw)
     else:
         raw = cached
 
     if not raw:
-        return {"categories": [], "fallback": True}
+        return {"categories": [], "profile": profile, "fallback": True}
 
     validated = await asyncio.gather(
         *[validate_category(raw.get(label, [])) for label in CATEGORY_LABELS]
@@ -96,4 +115,4 @@ async def recommendations_by_category(book: dict):
         if books
     ]
 
-    return {"categories": categories, "fallback": False}
+    return {"categories": categories, "profile": profile, "fallback": False}
