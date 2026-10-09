@@ -50,6 +50,13 @@ def init_db():
             )
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS taste_cache (
+                taste_key TEXT PRIMARY KEY,
+                recs_json TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ol_cache (
                 cache_key TEXT PRIMARY KEY,
                 docs_json TEXT NOT NULL,
@@ -87,6 +94,22 @@ def save_profile(book_id: str, profile: dict):
         conn.execute(
             "INSERT OR REPLACE INTO book_profile (book_id, profile_json) VALUES (?, ?)",
             (book_id, json.dumps(profile)),
+        )
+
+
+def get_taste_recs(taste_key: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT recs_json FROM taste_cache WHERE taste_key = ?", (taste_key,)
+        ).fetchone()
+        return json.loads(row["recs_json"]) if row else None
+
+
+def save_taste_recs(taste_key: str, recs: dict):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO taste_cache (taste_key, recs_json) VALUES (?, ?)",
+            (taste_key, json.dumps(recs)),
         )
 
 
