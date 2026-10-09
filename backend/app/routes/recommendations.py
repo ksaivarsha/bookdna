@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from fastapi import APIRouter
 import httpx
 from app.db import get_cached_dna, save_dna, get_profile, save_profile
 from app.services.dna import extract_profile, get_categorized_candidates
 from app.services.ol import search as ol_search
+from app.timing import stage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -90,13 +94,15 @@ async def ensure_profile(book: dict) -> tuple[dict | None, bool]:
 async def recommendations_by_category(book: dict):
     book_id = book.get("id", "")
 
-    profile, new_profile = await ensure_profile(book)
+    with stage("profile"):
+        profile, new_profile = await ensure_profile(book)
 
     # Cached recommendations predating this book's profile were generated
     # without it, so regenerate them when the profile is new.
     cached = get_cached_dna(book_id) if book_id and not new_profile else None
     if cached is None:
-        raw = await get_categorized_candidates(book, profile)
+        with stage("recommendations"):
+            raw = await get_categorized_candidates(book, profile)
         if raw and book_id:
             save_dna(book_id, raw)
     else:
@@ -105,9 +111,12 @@ async def recommendations_by_category(book: dict):
     if not raw:
         return {"categories": [], "profile": profile, "fallback": True}
 
-    validated = await asyncio.gather(
-        *[validate_category(raw.get(label, [])) for label in CATEGORY_LABELS]
-    )
+    with stage("validation"):
+        validated = await asyncio.gather(
+            *[validate_category(raw.get(label, [])) for label in CATEGORY_LABELS]
+        )
+    suggested = sum(len(raw.get(label, [])) for label in CATEGORY_LABELS)
+    logger.info("validation passed=%d of=%d", sum(len(v) for v in validated), suggested)
 
     categories = [
         {"label": label, "books": books}

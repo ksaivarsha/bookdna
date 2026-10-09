@@ -43,6 +43,10 @@ def _api_key() -> str:
 
 
 def _text(message, step: str) -> str | None:
+    logger.info(
+        "usage step=%s in=%d out=%d",
+        step.replace(" ", "_"), message.usage.input_tokens, message.usage.output_tokens,
+    )
     if message.stop_reason != "end_turn":
         logger.warning("%s: Claude stopped with stop_reason=%s", step, message.stop_reason)
     block = next((b for b in message.content if b.type == "text"), None)

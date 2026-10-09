@@ -1,6 +1,7 @@
 import asyncio
 from fastapi import APIRouter, HTTPException
 from app.services.ol import search as ol_search, work_description
+from app.timing import stage
 
 router = APIRouter()
 
@@ -39,9 +40,10 @@ async def search_books(q: str):
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Query too short")
 
-    docs = await ol_search(
-        {"q": q.strip(), "limit": 1, "fields": _FIELDS}
-    )
+    with stage("ol_search"):
+        docs = await ol_search(
+            {"q": q.strip(), "limit": 1, "fields": _FIELDS}
+        )
     if docs is None:
         raise HTTPException(status_code=503, detail=_OL_DOWN)
     if not docs:
@@ -53,10 +55,15 @@ async def search_books(q: str):
     authors = source_doc.get("author_name", [])
     related_q = subjects[0] if subjects else (authors[0] if authors else q.strip())
 
-    description, related_docs = await asyncio.gather(
-        work_description(source_doc.get("key", "")),
-        ol_search({"q": related_q, "limit": 10, "fields": _FIELDS}),
-    )
+    async def timed_description():
+        with stage("description"):
+            return await work_description(source_doc.get("key", ""))
+
+    async def timed_related():
+        with stage("ol_related"):
+            return await ol_search({"q": related_q, "limit": 10, "fields": _FIELDS})
+
+    description, related_docs = await asyncio.gather(timed_description(), timed_related())
     source_book = format_book(source_doc, description)
     if related_docs is None:
         related_docs = []  # OL down for related — return source with empty recs
