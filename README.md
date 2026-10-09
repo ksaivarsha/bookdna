@@ -4,7 +4,7 @@
 
 BookDNA is a book recommendation web app with a Victorian manuscript aesthetic. Give it any book and it surfaces categorized recommendations by storyline, tropes, world, and vibe, drawn from the Open Library and analyzed by an AI that reads each book's DNA.
 
-![BookDNA recommendations by storyline and tropes](docs/screenshot.png)
+![BookDNA For You shelves built from your recurring tropes and worlds](docs/screenshot.png)
 
 ### The library
 ![BookDNA homepage](docs/home.png)
@@ -111,9 +111,9 @@ The app opens at **http://localhost:5173**.
 
 ## What I'd build next
 
-1. **Book detail pages and a literary fingerprint card:** click any recommendation to read its full description and reason, and see the searched book's DNA (tropes, setting, tone) displayed as a fingerprint.
-2. **Reading list:** bookmark books to a personal list. The session infrastructure is already in place.
-3. **Genre mood selector:** pick a reading mood (romantasy, sci-fi, thriller, horror) and have the UI retheme itself with a cinematic transition. The theme system and transition infrastructure are already in the codebase.
+1. **Normalized settings:** have Claude pick each book's world setting from a fixed list instead of writing free text, so For You can count settings across books the way it already counts tropes and subgenres.
+2. **Book detail panels:** click any recommendation to open a panel with its full description, its DNA, and the reason it was chosen.
+3. **Reading list:** bookmark books to a personal list. The session infrastructure is already in place.
 
 ---
 
