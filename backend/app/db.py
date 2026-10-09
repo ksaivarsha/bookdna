@@ -43,6 +43,20 @@ def init_db():
             "ON search_history(session_id, searched_at)"
         )
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS book_profile (
+                book_id TEXT PRIMARY KEY,
+                profile_json TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS taste_cache (
+                taste_key TEXT PRIMARY KEY,
+                recs_json TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ol_cache (
                 cache_key TEXT PRIMARY KEY,
                 docs_json TEXT NOT NULL,
@@ -64,6 +78,38 @@ def save_dna(book_id: str, dna: dict):
         conn.execute(
             "INSERT OR REPLACE INTO dna_cache (book_id, dna_json) VALUES (?, ?)",
             (book_id, json.dumps(dna)),
+        )
+
+
+def get_profile(book_id: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT profile_json FROM book_profile WHERE book_id = ?", (book_id,)
+        ).fetchone()
+        return json.loads(row["profile_json"]) if row else None
+
+
+def save_profile(book_id: str, profile: dict):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO book_profile (book_id, profile_json) VALUES (?, ?)",
+            (book_id, json.dumps(profile)),
+        )
+
+
+def get_taste_recs(taste_key: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT recs_json FROM taste_cache WHERE taste_key = ?", (taste_key,)
+        ).fetchone()
+        return json.loads(row["recs_json"]) if row else None
+
+
+def save_taste_recs(taste_key: str, recs: dict):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO taste_cache (taste_key, recs_json) VALUES (?, ?)",
+            (taste_key, json.dumps(recs)),
         )
 
 
@@ -93,8 +139,8 @@ def add_to_history(
 OL_CACHE_TTL_DAYS = 7
 
 
-def get_ol_cache(key: str) -> list | None:
-    """Return cached OL docs list, or None if missing/expired."""
+def get_ol_cache(key: str) -> list | dict | None:
+    """Return cached OL payload (search docs list or work dict), or None if missing/expired."""
     with _db() as conn:
         row = conn.execute(
             "SELECT docs_json, created_at FROM ol_cache WHERE cache_key = ?", (key,)
@@ -108,7 +154,7 @@ def get_ol_cache(key: str) -> list | None:
         return json.loads(row["docs_json"])
 
 
-def set_ol_cache(key: str, docs: list):
+def set_ol_cache(key: str, docs: list | dict):
     with _db() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO ol_cache (cache_key, docs_json) VALUES (?, ?)",

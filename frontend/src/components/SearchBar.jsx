@@ -16,6 +16,29 @@ function BookCard({ book }) {
   )
 }
 
+function BookDNA({ profile }) {
+  if (!profile) return null
+  const tropes = profile.tropes || []
+  return (
+    <div className="book-dna">
+      {tropes.length > 0 && (
+        <div className="book-dna__tropes">
+          {tropes.map(t => <span key={t} className="dna-chip">{t}</span>)}
+        </div>
+      )}
+      <div className="book-dna__meta">
+        {profile.world_setting && (
+          <span><span className="book-dna__label">Setting</span>{profile.world_setting}</span>
+        )}
+        {profile.world_setting && profile.tone && <span className="book-dna__sep">❧</span>}
+        {profile.tone && (
+          <span><span className="book-dna__label">Tone</span>{profile.tone}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function SearchBar({ onSearch }) {
   const [query, setQuery]           = useState('')
   const [focused, setFocused]       = useState(false)
@@ -24,6 +47,7 @@ export function SearchBar({ onSearch }) {
   const [results, setResults]       = useState(null)
   const [catLoading, setCatLoading] = useState(false)
   const [categories, setCategories] = useState(null)
+  const [profile, setProfile]       = useState(null)
 
   async function handleSearch() {
     if (!query.trim()) return
@@ -31,6 +55,7 @@ export function SearchBar({ onSearch }) {
     setError('')
     setResults(null)
     setCategories(null)
+    setProfile(null)
     try {
       const data = await searchBooks(query)
       setResults(data)
@@ -39,6 +64,7 @@ export function SearchBar({ onSearch }) {
       setCatLoading(true)
       getRecommendationsByCategory(data.source)
         .then(rec => {
+          if (rec.profile) setProfile(rec.profile)
           if (!rec.fallback && rec.categories?.length) setCategories(rec.categories)
         })
         .catch(() => {})
@@ -93,6 +119,7 @@ export function SearchBar({ onSearch }) {
             <em>{results.source.title}</em>
             {results.source.authors?.[0] && <> by {results.source.authors[0]}</>}
           </p>
+          <BookDNA profile={profile} />
 
           {/* Phase 1: genre fallback recs (always shown until category recs replace them) */}
           {!categories && results.recommendations.length > 0 && (
