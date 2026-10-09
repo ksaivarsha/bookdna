@@ -146,17 +146,25 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
         <div className="search-results">
           <FeaturedBook book={results.source} profile={profile} profileLoading={catLoading} />
 
-          {/* Phase 1: genre picks, shown until the first AI shelf arrives (and kept if none do) */}
+          {/* AI shelves; placeholder shelves hold each place until it arrives */}
+          <CategorySection
+            categories={categories}
+            loading={catLoading}
+            onSelect={onSelectBook}
+            expectedLabels={SHELF_ORDER}
+          />
+
+          {/* Genre picks: shown until the first AI shelf arrives, and kept if none do */}
           {!categories && genrePicks.length > 0 && (
-            <div className="genre-recs">
-              {genrePicks.map(book => (
-                <BookCard key={book.id} book={book} onSelect={onSelectBook} />
-              ))}
+            <div className="category-group">
+              <h3 className="category-label">From the same stacks</h3>
+              <div className="genre-recs">
+                {genrePicks.map(book => (
+                  <BookCard key={book.id} book={book} onSelect={onSelectBook} />
+                ))}
+              </div>
             </div>
           )}
-
-          {/* Phase 2: categorized recs */}
-          <CategorySection categories={categories} loading={catLoading} onSelect={onSelectBook} />
         </div>
       )}
     </section>
