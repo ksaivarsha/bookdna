@@ -421,6 +421,53 @@
   font-size: 0.95rem;
 }
 
+/* Searched book's DNA: trope chips + setting and tone */
+.book-dna {
+  text-align: center;
+  margin: -0.4rem auto 1.2rem;
+  max-width: 34rem;
+}
+
+.book-dna__tropes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 0.55rem;
+}
+
+.dna-chip {
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--ink-light);
+  padding: 1px 10px 2px;
+  border: 0.5px solid var(--ink-gold);
+  border-radius: 2px;
+  background: rgba(212, 190, 132, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(232, 213, 160, 0.9),
+              inset 0 0 0 2.5px rgba(122, 80, 16, 0.35);
+}
+
+.book-dna__meta {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.book-dna__label {
+  font-weight: 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-gold);
+  margin-right: 0.4em;
+}
+
+.book-dna__sep {
+  margin: 0 0.7em;
+  color: var(--ink-gold);
+}
+
 /* Fallback 6-card genre recs */
 .genre-recs {
   display: flex;
