@@ -790,6 +790,166 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   CLICKABLE CARDS — recommendations open the detail panel
+   ═══════════════════════════════════════════════════════════════ */
+
+button.rec-card,
+button.book-card-small {
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+button.rec-card:hover,
+button.book-card-small:hover { transform: translateY(-2px); }
+button.rec-card:hover .rec-card__cover,
+button.book-card-small:hover .book-card-small__cover {
+  box-shadow: 2px 3px 8px rgba(40, 25, 5, 0.35);
+}
+button.rec-card:focus-visible,
+button.book-card-small:focus-visible {
+  outline: 1px solid var(--ink-gold);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DETAIL PANEL — a manuscript leaf laid over the page
+   ═══════════════════════════════════════════════════════════════ */
+
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(30, 18, 4, 0.55);
+  backdrop-filter: blur(2px);
+  animation: overlay-in 0.25s ease;
+}
+
+.detail-panel {
+  position: relative;
+  width: min(36rem, 100%);
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  padding: 2rem 2.1rem 1.6rem;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at center, rgba(250, 238, 200, 0.9), rgba(226, 204, 150, 0.95)),
+    var(--parchment);
+  border: 1px solid var(--ink-light);
+  outline: 0.5px solid var(--ink-light);
+  outline-offset: -7px;
+  box-shadow: 0 12px 40px rgba(20, 10, 0, 0.5), inset 0 0 40px rgba(122, 80, 16, 0.18);
+  animation: leaf-in 0.3s ease;
+}
+
+@keyframes overlay-in { from { opacity: 0; } }
+@keyframes leaf-in    { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+
+.detail-panel__close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.detail-panel__close:hover { color: var(--ink); }
+.detail-panel__close:focus-visible { outline: 1px solid var(--ink-gold); }
+
+.detail-panel__head {
+  display: flex;
+  gap: 1.1rem;
+  align-items: flex-end;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 0.5px solid var(--ink-light);
+}
+
+.detail-panel__cover {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 144px;
+  object-fit: cover;
+  border: 0.5px solid var(--ink-light);
+  box-shadow: 2px 3px 8px rgba(40, 25, 5, 0.35);
+}
+
+.detail-panel__title {
+  font-weight: 600;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  margin-bottom: 0.3rem;
+  padding-right: 1.5rem;
+}
+
+.detail-panel__section { margin-bottom: 1rem; }
+
+/* Same chapter-heading style as the shelf labels */
+.detail-panel__label {
+  font-weight: 600;
+  font-size: 0.66rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-gold);
+  margin-bottom: 0.35rem;
+}
+
+.detail-panel__reason {
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.detail-panel__description {
+  white-space: pre-line;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink-light);
+}
+
+.detail-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 0.5px solid var(--ink-light);
+}
+
+.detail-panel__seek {
+  border: 1px solid var(--ink-light);
+  padding: 0.45rem 1.1rem;
+}
+
+.detail-panel__ol {
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 0.5px solid var(--ink-gold);
+}
+.detail-panel__ol:hover { color: var(--ink); }
+.detail-panel__ol:focus-visible { outline: 1px solid var(--ink-gold); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-overlay, .detail-panel { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════ */
 

@@ -1,9 +1,10 @@
-function RecCard({ book }) {
+function RecCard({ book, onSelect }) {
   return (
-    <div className="rec-card">
+    <button type="button" className="rec-card" onClick={() => onSelect?.(book)}
+      aria-label={`${book.title}, details`}>
       <div className="rec-card__cover-wrap">
         {book.cover ? (
-          <img src={book.cover} alt={book.title} className="rec-card__cover" />
+          <img src={book.cover} alt="" className="rec-card__cover" />
         ) : (
           <div className="rec-card__no-cover">No cover</div>
         )}
@@ -11,11 +12,11 @@ function RecCard({ book }) {
       <div className="rec-card__title">{book.title}</div>
       <div className="rec-card__author">{(book.authors || []).slice(0, 1).join('')}</div>
       {book.reason && <div className="rec-card__reason">{book.reason}</div>}
-    </div>
+    </button>
   )
 }
 
-export function CategorySection({ categories, loading }) {
+export function CategorySection({ categories, loading, onSelect }) {
   const shelves = categories || []
   if (!loading && shelves.length === 0) return null
 
@@ -26,7 +27,7 @@ export function CategorySection({ categories, loading }) {
           <h3 className="category-label">{cat.label}</h3>
           <div className="category-books">
             {cat.books.map(book => (
-              <RecCard key={book.id || book.title} book={book} />
+              <RecCard key={book.id || book.title} book={book} onSelect={onSelect} />
             ))}
           </div>
         </div>

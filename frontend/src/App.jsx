@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './index.css'
 import './App.css'
 import { ThemeProvider }        from './contexts/ThemeContext'
@@ -10,6 +10,7 @@ import { Logo }                 from './components/Logo'
 import { SearchBar }            from './components/SearchBar'
 import { ForYouSection }        from './components/ForYouSection'
 import { CinematicTransition }  from './components/CinematicTransition'
+import { BookDetailPanel }      from './components/BookDetailPanel'
 
 function readQuery() {
   return (new URLSearchParams(window.location.search).get('q') || '').trim()
@@ -24,6 +25,14 @@ function BookPage() {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+
+  const [selectedBook, setSelectedBook] = useState(null)
+  const closePanel = useCallback(() => setSelectedBook(null), [])
+
+  function seekBook(book) {
+    setSelectedBook(null)
+    navigate([book.title, book.authors?.[0]].filter(Boolean).join(' '))
+  }
 
   function navigate(q) {
     if (q === query) return
@@ -44,12 +53,21 @@ function BookPage() {
         <Logo onHome={() => navigate('')} />
         <DividerOrnament />
 
-        {!query && <ForYouSection />}
+        {!query && <ForYouSection onSelectBook={setSelectedBook} />}
 
-        <SearchBar activeQuery={query} onSubmit={navigate} onHome={() => navigate('')} />
+        <SearchBar
+          activeQuery={query}
+          onSubmit={navigate}
+          onHome={() => navigate('')}
+          onSelectBook={setSelectedBook}
+        />
 
         <DividerOrnament variant="tail" />
       </main>
+
+      {selectedBook && (
+        <BookDetailPanel book={selectedBook} onClose={closePanel} onSeek={seekBook} />
+      )}
 
       <CinematicTransition />
     </div>

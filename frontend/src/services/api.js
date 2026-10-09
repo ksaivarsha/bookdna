@@ -33,6 +33,12 @@ export async function addToHistory(source) {
   }).catch(() => {})
 }
 
+export async function getWorkDescription(key, signal) {
+  const response = await fetch(`${BASE_URL}/books/work?key=${encodeURIComponent(key)}`, { signal })
+  if (!response.ok) throw new Error('Description unavailable')
+  return (await response.json()).description || ''
+}
+
 export async function getRelated(book) {
   try {
     const response = await fetch(`${BASE_URL}/books/related`, {

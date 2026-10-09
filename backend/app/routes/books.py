@@ -54,6 +54,14 @@ async def search_books(q: str):
     return {"source": format_book(source_doc, description)}
 
 
+@router.get("/work")
+async def work_details(key: str):
+    """Description for a recommended book's detail panel (cached works fetch)."""
+    if not key.startswith("/works/"):
+        raise HTTPException(status_code=400, detail="Expected a /works/ key")
+    return {"description": await work_description(key)}
+
+
 @router.post("/related")
 async def related_books(book: dict):
     """

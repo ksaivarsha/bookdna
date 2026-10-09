@@ -6,21 +6,22 @@ import { FeaturedBook } from './FeaturedBook'
 const SHELF_ORDER = ['Similar Storyline', 'Similar Tropes', 'Similar World/Setting', 'Same Vibe']
 const byShelfOrder = (a, b) => SHELF_ORDER.indexOf(a.label) - SHELF_ORDER.indexOf(b.label)
 
-function BookCard({ book }) {
+function BookCard({ book, onSelect }) {
   return (
-    <div className="book-card-small">
+    <button type="button" className="book-card-small" onClick={() => onSelect?.(book)}
+      aria-label={`${book.title}, details`}>
       {book.cover ? (
-        <img src={book.cover} alt={book.title} className="book-card-small__cover" />
+        <img src={book.cover} alt="" className="book-card-small__cover" />
       ) : (
         <div className="book-card-small__no-cover">No cover</div>
       )}
       <div className="book-card-small__title">{book.title}</div>
       <div className="book-card-small__author">{(book.authors || []).join(', ')}</div>
-    </div>
+    </button>
   )
 }
 
-export function SearchBar({ activeQuery, onSubmit, onHome }) {
+export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
   const [draft, setDraft]           = useState(activeQuery)
   const [focused, setFocused]       = useState(false)
   const [loading, setLoading]       = useState(false)
@@ -149,13 +150,13 @@ export function SearchBar({ activeQuery, onSubmit, onHome }) {
           {!categories && genrePicks.length > 0 && (
             <div className="genre-recs">
               {genrePicks.map(book => (
-                <BookCard key={book.id} book={book} />
+                <BookCard key={book.id} book={book} onSelect={onSelectBook} />
               ))}
             </div>
           )}
 
           {/* Phase 2: categorized recs */}
-          <CategorySection categories={categories} loading={catLoading} />
+          <CategorySection categories={categories} loading={catLoading} onSelect={onSelectBook} />
         </div>
       )}
     </section>
