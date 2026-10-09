@@ -93,8 +93,8 @@ def add_to_history(
 OL_CACHE_TTL_DAYS = 7
 
 
-def get_ol_cache(key: str) -> list | None:
-    """Return cached OL docs list, or None if missing/expired."""
+def get_ol_cache(key: str) -> list | dict | None:
+    """Return cached OL payload (search docs list or work dict), or None if missing/expired."""
     with _db() as conn:
         row = conn.execute(
             "SELECT docs_json, created_at FROM ol_cache WHERE cache_key = ?", (key,)
@@ -108,7 +108,7 @@ def get_ol_cache(key: str) -> list | None:
         return json.loads(row["docs_json"])
 
 
-def set_ol_cache(key: str, docs: list):
+def set_ol_cache(key: str, docs: list | dict):
     with _db() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO ol_cache (cache_key, docs_json) VALUES (?, ?)",

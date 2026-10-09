@@ -1,5 +1,6 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
-from app.services.ol import search as ol_search
+from app.services.ol import search as ol_search, work_description
 
 router = APIRouter()
 
@@ -14,13 +15,13 @@ _FIELDS = (
 )
 
 
-def format_book(doc: dict) -> dict:
+def format_book(doc: dict, description: str = "") -> dict:
     cover_id = doc.get("cover_i")
     return {
         "id": doc.get("key", ""),
         "title": doc.get("title", "Unknown Title"),
         "authors": doc.get("author_name", ["Unknown Author"]),
-        "description": "",
+        "description": description,
         "categories": doc.get("subject", [])[:3],
         "cover": (
             f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
@@ -47,15 +48,16 @@ async def search_books(q: str):
         raise HTTPException(status_code=404, detail="Book not found")
 
     source_doc = docs[0]
-    source_book = format_book(source_doc)
 
     subjects = source_doc.get("subject", [])
     authors = source_doc.get("author_name", [])
     related_q = subjects[0] if subjects else (authors[0] if authors else q.strip())
 
-    related_docs = await ol_search(
-        {"q": related_q, "limit": 10, "fields": _FIELDS}
+    description, related_docs = await asyncio.gather(
+        work_description(source_doc.get("key", "")),
+        ol_search({"q": related_q, "limit": 10, "fields": _FIELDS}),
     )
+    source_book = format_book(source_doc, description)
     if related_docs is None:
         related_docs = []  # OL down for related — return source with empty recs
 
