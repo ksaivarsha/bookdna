@@ -81,7 +81,7 @@ function bookHeader(book: Book, descriptionChars: number): string {
   return [
     `Book: "${book.title}" by ${book.authors.join(", ") || "Unknown"}`,
     `Published: ${book.year ?? ""}`,
-    `Genres: ${book.subjects.join(", ")}`,
+    `Genres: ${book.subjects.slice(0, 12).join(", ")}`,
     `Description: ${book.description.slice(0, descriptionChars)}`,
   ].join("\n");
 }

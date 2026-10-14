@@ -1,8 +1,8 @@
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
 import { SHELVES, extractProfile, hasApiKey, shelfCandidates, tropeCandidates, type ClaudeResult, type Profile, type ShelfKey } from "./src/claude.js";
-import { claudeGate, resultCache, sessionStore, LIMITS } from "./src/guard.js";
-import { booksBySubjects, findBook, validateShelf, type Book, type Candidate, type ShelfBook } from "./src/openlibrary.js";
+import { callerOf, claudeGate, resultCache, LIMITS } from "./src/guard.js";
+import { booksBySubjects, findBook, specificSubjects, validateShelf, type Book, type Candidate, type ShelfBook } from "./src/openlibrary.js";
 
 const SHELF_SIZE = 6;
 // Claude over-asks so books Open Library can't verify still leave a full shelf.
@@ -20,9 +20,6 @@ const server = new MCPServer({
   websiteUrl: "https://openlibrary.org",
   icons: [{ src: "icon.svg", mimeType: "image/svg+xml", sizes: ["512x512"] }],
 });
-
-// The MCP session ID is only available to middleware; expose it to the guard.
-server.use("mcp:tools/call", async (ctx, next) => sessionStore.run(ctx.session?.sessionId ?? "anonymous", next));
 
 // ── Shared schemas and helpers ────────────────────────────────────────────
 
@@ -55,10 +52,12 @@ const UNREACHABLE = fail("Open Library isn't responding right now, so BookDNA ca
 const NO_KEY = "BookDNA's AI features aren't configured on this server, so these results come from Open Library alone.";
 
 /** Runs a handler, turning anything unexpected into a friendly tool error. */
-function safe<A, R>(name: string, fn: (args: A) => Promise<R>) {
-  return async (args: A) => {
+type Ctx = Parameters<typeof callerOf>[0];
+
+function safe<A, R>(name: string, fn: (args: A, caller: string) => Promise<R>) {
+  return async (args: A, ctx: Ctx) => {
     try {
-      return await fn(args);
+      return await fn(args, callerOf(ctx));
     } catch (e) {
       console.error(`${name} crashed: ${(e as Error)?.name ?? "Error"}`);
       return fail("Something went wrong inside BookDNA. Please try again.");
@@ -91,9 +90,9 @@ type Gated<T> = { ok: true; value: T } | { ok: false; fallback: string } | { ok:
  * key asks the caller for its Open Library fallback; rate limits and API
  * failures become friendly errors.
  */
-async function guarded<T>(call: () => Promise<ClaudeResult<T>>): Promise<Gated<T>> {
+async function guarded<T>(caller: string, call: () => Promise<ClaudeResult<T>>): Promise<Gated<T>> {
   if (!hasApiKey()) return { ok: false, fallback: NO_KEY };
-  const gate = claudeGate();
+  const gate = claudeGate(caller);
   if (!gate.ok) return gate.kind === "daily" ? { ok: false, fallback: gate.message } : { ok: false, error: fail(gate.message) };
   const r = await call();
   return r.ok ? r : { ok: false, error: fail(r.message) };
@@ -101,6 +100,7 @@ async function guarded<T>(call: () => Promise<ClaudeResult<T>>): Promise<Gated<T
 
 /** Validates Claude's candidates and builds a shelf, or an Open Library fallback. */
 async function buildShelf(
+  caller: string,
   cacheKey: string,
   heading: string,
   subheading: string,
@@ -111,7 +111,7 @@ async function buildShelf(
   const cached = resultCache.get(cacheKey) as ShelfBook[] | undefined;
   if (cached) return shelfResult({ heading, subheading, books: cached, source: "cache" });
 
-  const r = await guarded(candidates);
+  const r = await guarded(caller, candidates);
   if (!r.ok && "error" in r) return r.error;
   if (!r.ok) {
     const books = await booksBySubjects(fallbackSubjects, SHELF_SIZE, exclude);
@@ -202,7 +202,7 @@ export const getBookDna = server.tool(
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   },
-  safe("get_book_dna", async ({ query }: { query: string }) => {
+  safe("get_book_dna", async ({ query }: { query: string }, caller) => {
     const r = await lookup(query);
     if ("error" in r) return r.error;
     const book = r.book;
@@ -212,7 +212,7 @@ export const getBookDna = server.tool(
     let source: "ai" | "cache" | "open_library_only" = "cache";
     let notice: string | undefined;
     if (!dna) {
-      const g = await guarded(() => extractProfile(book));
+      const g = await guarded(caller, () => extractProfile(book));
       if (!g.ok && "error" in g) return g.error;
       if (g.ok) {
         dna = g.value;
@@ -233,7 +233,7 @@ export const getBookDna = server.tool(
           `Tone: ${dna.tone}`,
           `Storyline: ${dna.storyline_summary}`,
         ].join("\n")
-      : `${notice}\n${byline(book)}\nOpen Library subjects: ${book.subjects.join(", ") || "none listed"}`;
+      : `${notice}\n${byline(book)}\nOpen Library subjects: ${specificSubjects(book.subjects, 10).join(", ") || "none listed"}`;
     return {
       content: [{ type: "text" as const, text }],
       structuredContent: { book: toBookOut(book), dna: dna ?? null, subjects: book.subjects, source, ...(notice ? { notice } : {}) },
@@ -241,14 +241,16 @@ export const getBookDna = server.tool(
   }),
 );
 
-const shelfView = {
-  name: "book-shelf",
+// Each view binds to exactly one tool, so the two shelf tools get a view
+// each; both render the shared Shelf component.
+const shelfView = (name: "book-shelf" | "trope-shelf") => ({
+  name,
   description: "A shelf of book covers with titles, authors and the reason each was chosen",
   prefersBorder: false,
   csp: {
     resourceDomains: ["https://covers.openlibrary.org", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
   },
-};
+});
 
 export const recommend = server.tool(
   {
@@ -267,16 +269,17 @@ export const recommend = server.tool(
         .describe("Which kind of similarity: storyline, tropes, world (setting/subgenre) or vibe (tone)"),
     }),
     outputSchema: ShelfOutputSchema,
-    view: shelfView,
+    view: shelfView("book-shelf"),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   },
-  safe("recommend", async ({ query, shelf }: { query: string; shelf: ShelfKey }) => {
+  safe("recommend", async ({ query, shelf }: { query: string; shelf: ShelfKey }, caller) => {
     const r = await lookup(query);
     if ("error" in r) return r.error;
     const book = r.book;
     // Ground the prompt in the book's DNA when get_book_dna already produced it.
     const profile = (resultCache.get(`dna:${book.id}`) as Profile | undefined) ?? null;
     return buildShelf(
+      caller,
       `${shelf}:${book.id}`,
       SHELVES[shelf].label,
       `For readers of ${byline(book)}`,
@@ -312,14 +315,15 @@ export const recommendByTropes = server.tool(
         .describe('Optional world or setting, e.g. "fae court", "Victorian London", "space station"'),
     }),
     outputSchema: ShelfOutputSchema,
-    view: shelfView,
+    view: shelfView("trope-shelf"),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   },
-  safe("recommend_by_tropes", async ({ tropes, setting }: { tropes: string[]; setting?: string }) => {
+  safe("recommend_by_tropes", async ({ tropes, setting }: { tropes: string[]; setting?: string }, caller) => {
     const ts = normTropes(tropes);
     if (!ts.length) return fail("Please name at least one trope, e.g. \"enemies to lovers\".");
     const place = setting?.trim();
     return buildShelf(
+      caller,
       `tropes:${[...ts].sort().join("|")}:${place?.toLowerCase() ?? ""}`,
       "Books by Trope",
       `${ts.join(" · ")}${place ? ` in ${place}` : ""}`,
@@ -329,6 +333,6 @@ export const recommendByTropes = server.tool(
   }),
 );
 
-console.log(`BookDNA guard: ${LIMITS.perMinute}/min, ${LIMITS.perSessionPerMinute}/min per session, ${LIMITS.dailyCap}/day`);
+console.log(`BookDNA guard: ${LIMITS.perMinute}/min, ${LIMITS.perCallerPerMinute}/min per caller, ${LIMITS.dailyCap}/day`);
 
 export default server;

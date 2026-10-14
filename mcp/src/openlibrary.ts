@@ -116,7 +116,7 @@ export async function findBook(query: string): Promise<FindResult> {
       year: doc.first_publish_year ?? null,
       cover: coverUrl(doc.cover_i, "L"),
       description: await workDescription(doc.key),
-      subjects: (doc.subject ?? []).slice(0, 12),
+      subjects: (doc.subject ?? []).slice(0, 40),
     },
   };
 }
@@ -167,32 +167,55 @@ export async function validateShelf(candidates: Candidate[], limit: number, excl
   return { books: books.slice(0, limit), suggested: candidates.length, passed: books.length };
 }
 
+// Catalogue and marketing subjects that say nothing about what a book is like.
+const GENERIC_SUBJECT = /[:=]|^(fiction|roman|novel|general|literature|english|american|large type|accessible|protected daisy|in library|lending library|open library|reading level|juvenile|young adult|nyt|new york times)\b|best ?sellers?|translations?/i;
+
+/** Up to `max` subjects worth matching on, generic catalogue entries removed. */
+export function specificSubjects(subjects: string[], max = 6): string[] {
+  const out: string[] = [];
+  for (const s of subjects.map((x) => x.trim())) {
+    if (s && s.length <= 40 && !GENERIC_SUBJECT.test(s) && !out.some((o) => o.toLowerCase() === s.toLowerCase())) out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /**
  * Open Library-only fallback used when the AI budget is spent: books sharing
- * any of the given subjects, most popular first. Null if OL is unreachable.
+ * the given subjects, ranked by how many they share (then popularity).
+ * Null if OL is unreachable.
  */
 export async function booksBySubjects(subjects: string[], limit: number, exclude: string[] = []): Promise<ShelfBook[] | null> {
-  const terms = subjects.map((s) => s.trim()).filter(Boolean).slice(0, 4);
+  const terms = specificSubjects(subjects, 5);
   if (!terms.length) return [];
-  const q = terms.map((s) => `subject:"${s.replace(/"/g, "")}"`).join(" OR ");
-  const docs = await search({ q, limit: String(limit + exclude.length + 4), fields: "key,title,author_name,cover_i,subject" });
+  const anyOf = terms.map((s) => `subject:"${s.replace(/"/g, "")}"`).join(" OR ");
+  // Keep a novel's fallback shelf to fiction; subjects alone pull in trivia books.
+  const fiction = subjects.some((s) => /\bfiction\b/i.test(s));
+  const q = fiction ? `(${anyOf}) AND subject:fiction` : anyOf;
+  const docs = await search({ q, limit: "40", fields: "key,title,author_name,cover_i,subject" });
   if (docs === null) return null;
+
   const seen = new Set(exclude);
-  const books: ShelfBook[] = [];
+  const scored: { book: ShelfBook; score: number }[] = [];
   for (const d of docs) {
     if (!d.key || seen.has(d.key)) continue;
     seen.add(d.key);
-    const lower = (d.subject ?? []).map((s) => s.toLowerCase());
-    const shared = terms.find((t) => lower.includes(t.toLowerCase())) ?? terms[0];
-    books.push({
-      id: d.key,
-      title: d.title ?? "Untitled",
-      author: d.author_name?.[0] ?? "Unknown",
-      cover: coverUrl(d.cover_i),
-      reason: `Shares the Open Library subject "${shared}".`,
-      url: workUrl(d.key),
+    const lower = new Set((d.subject ?? []).map((s) => s.toLowerCase()));
+    const shared = terms.filter((t) => lower.has(t.toLowerCase()));
+    if (!shared.length) continue;
+    const list = shared.slice(0, 2).map((t) => `"${t.toLowerCase()}"`).join(" and ");
+    scored.push({
+      score: shared.length,
+      book: {
+        id: d.key,
+        title: d.title ?? "Untitled",
+        author: d.author_name?.[0] ?? "Unknown",
+        cover: coverUrl(d.cover_i),
+        reason: `Shares the Open Library subject${shared.length > 1 ? "s" : ""} ${list}.`,
+        url: workUrl(d.key),
+      },
     });
-    if (books.length >= limit) break;
   }
-  return books;
+  // Array sort is stable, so equal scores keep Open Library's popularity order.
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((s) => s.book);
 }

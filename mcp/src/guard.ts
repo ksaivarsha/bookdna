@@ -1,9 +1,7 @@
 // Cost protection for the tools that call Claude: an in-memory result cache,
-// a sliding-window rate limit (global and per MCP session), and a daily cap.
+// a sliding-window rate limit (global and per caller), and a daily cap.
 // State lives in this process, so it resets on restart and is not shared
 // between instances; the Anthropic console spend limit is the hard backstop.
-
-import { AsyncLocalStorage } from "node:async_hooks";
 
 function intEnv(name: string, fallback: number): number {
   const n = Number.parseInt(process.env[name] ?? "", 10);
@@ -12,7 +10,7 @@ function intEnv(name: string, fallback: number): number {
 
 export const LIMITS = {
   perMinute: intEnv("CLAUDE_CALLS_PER_MINUTE", 10),
-  perSessionPerMinute: intEnv("CLAUDE_CALLS_PER_SESSION_PER_MINUTE", 3),
+  perCallerPerMinute: intEnv("CLAUDE_CALLS_PER_CALLER_PER_MINUTE", 3),
   dailyCap: intEnv("CLAUDE_DAILY_CAP", 100),
 };
 
@@ -47,7 +45,7 @@ export const resultCache = new TTLCache<unknown>(500, 24 * 60 * 60 * 1000);
 
 const WINDOW_MS = 60_000;
 const globalCalls: number[] = [];
-const sessionCalls = new Map<string, number[]>();
+const callerCalls = new Map<string, number[]>();
 let day = "";
 let dailyCount = 0;
 
@@ -57,9 +55,19 @@ function prune(calls: number[], now: number) {
   while (calls.length && calls[0] <= now - WINDOW_MS) calls.shift();
 }
 
-// The MCP session ID is only visible to middleware, so index.ts runs each
-// tool call inside this store and the guard reads it from here.
-export const sessionStore = new AsyncLocalStorage<string>();
+type Ctx = { request?: { header(name: string): string | undefined } };
+
+/**
+ * Who is calling, for the per-caller limit. mcp-use v2 serves MCP statelessly,
+ * so there is no session ID; the client IP stands in for one. It is the last
+ * X-Forwarded-For hop, the one the hosting proxy appended: earlier hops are
+ * whatever the client sent and could be rotated to dodge the limit. Locally
+ * every call is "local".
+ */
+export function callerOf(ctx: Ctx): string {
+  const forwarded = ctx.request?.header("x-forwarded-for")?.split(",").at(-1)?.trim();
+  return forwarded || ctx.request?.header("x-real-ip") || "local";
+}
 
 export type Gate =
   | { ok: true }
@@ -70,7 +78,7 @@ export type Gate =
  * Ask permission for one Claude call. On success the call is counted against
  * every limit, so only call this right before actually calling Claude.
  */
-export function claudeGate(): Gate {
+export function claudeGate(caller: string): Gate {
   const now = Date.now();
   if (day !== today()) {
     day = today();
@@ -85,13 +93,12 @@ export function claudeGate(): Gate {
     };
   }
 
-  const session = sessionStore.getStore() ?? "anonymous";
-  const mine = sessionCalls.get(session) ?? [];
+  const mine = callerCalls.get(caller) ?? [];
   prune(globalCalls, now);
   prune(mine, now);
 
   const blocking =
-    mine.length >= LIMITS.perSessionPerMinute ? mine[0] :
+    mine.length >= LIMITS.perCallerPerMinute ? mine[0] :
     globalCalls.length >= LIMITS.perMinute ? globalCalls[0] : null;
   if (blocking !== null) {
     const retryAfterSeconds = Math.max(1, Math.ceil((blocking + WINDOW_MS - now) / 1000));
@@ -105,17 +112,13 @@ export function claudeGate(): Gate {
 
   globalCalls.push(now);
   mine.push(now);
-  sessionCalls.set(session, mine);
+  callerCalls.set(caller, mine);
   dailyCount++;
-  if (sessionCalls.size > 5000) {
-    for (const [id, calls] of sessionCalls) {
+  if (callerCalls.size > 5000) {
+    for (const [id, calls] of callerCalls) {
       prune(calls, now);
-      if (!calls.length) sessionCalls.delete(id);
+      if (!calls.length) callerCalls.delete(id);
     }
   }
   return { ok: true };
-}
-
-export function usage() {
-  return { today: day === today() ? dailyCount : 0, dailyCap: LIMITS.dailyCap };
 }
