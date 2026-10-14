@@ -72,7 +72,10 @@ export function callerOf(ctx: Ctx): string {
     // Diagnostic: the shape of the forwarding chain (public/private per hop),
     // never the addresses themselves.
     const shape = hops.map((h) => (PRIVATE_IP.test(h.trim()) ? "private" : "public")).join(",");
-    console.log(`caller xff=[${shape}] x-real-ip=${realIp ? (PRIVATE_IP.test(realIp) ? "private" : "public") : "none"}`);
+    // 203.0.113.0/24 is reserved for documentation, so it only appears if a
+    // test client spoofed it and the edge passed the spoofed hop through.
+    const spoofKept = hops.some((h) => h.trim().startsWith("203.0.113."));
+    console.log(`caller xff=[${shape}] spoofed-testnet-hop-kept=${spoofKept} x-real-ip=${realIp ? (PRIVATE_IP.test(realIp) ? "private" : "public") : "none"}`);
   }
   return forwarded || realIp || "local";
 }
