@@ -26,6 +26,7 @@
     "typecheck": "mcp-use typecheck"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
     "mcp-use": "2.9.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
