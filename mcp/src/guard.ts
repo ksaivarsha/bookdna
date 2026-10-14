@@ -59,14 +59,18 @@ type Ctx = { request?: { header(name: string): string | undefined } };
 
 /**
  * Who is calling, for the per-caller limit. mcp-use v2 serves MCP statelessly,
- * so there is no session ID; the client IP stands in for one. It is the last
- * X-Forwarded-For hop, the one the hosting proxy appended: earlier hops are
- * whatever the client sent and could be rotated to dodge the limit. Locally
- * every call is "local".
+ * so there is no session ID; the client IP stands in for one.
+ *
+ * It is the FIRST X-Forwarded-For hop. Manufact's edge discards any
+ * X-Forwarded-For the client sends and writes its own chain (client IP, then
+ * three platform proxies), verified with spoofed headers on 2026-10-14; the
+ * last hop is a platform proxy shared by every caller. On a host that passes
+ * client-sent hops through, the first hop would be spoofable; re-check with
+ * LOG_CALLER_SHAPE=1 before moving hosts. Locally every call is "local".
  */
 export function callerOf(ctx: Ctx): string {
   const hops = ctx.request?.header("x-forwarded-for")?.split(",") ?? [];
-  const forwarded = hops.at(-1)?.trim();
+  const forwarded = hops[0]?.trim();
   const realIp = ctx.request?.header("x-real-ip");
   if (process.env.LOG_CALLER_SHAPE) {
     // Diagnostic: the shape of the forwarding chain (public/private per hop),

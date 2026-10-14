@@ -18,7 +18,7 @@ Every recommended book is looked up on Open Library and dropped unless at least 
 All guard state lives in memory (see `src/guard.ts`):
 
 - **Cache.** Claude-backed results are kept for 24 hours, keyed by tool and normalised input. Repeat requests skip Claude and the limits.
-- **Rate limit.** 10 Claude calls a minute overall and 3 a minute per caller. Callers are identified by client IP, because mcp-use v2 serves MCP statelessly and has no session ID. Over the limit, tools return a friendly "try again in N seconds".
+- **Rate limit.** 10 Claude calls a minute overall and 3 a minute per caller. Callers are identified by client IP (the first `X-Forwarded-For` hop, which the Manufact edge writes itself), because mcp-use v2 serves MCP statelessly and has no session ID. Over the limit, tools return a friendly "try again in N seconds".
 - **Daily cap.** 100 Claude calls a day (UTC). Once it is reached, `get_book_dna` returns Open Library details only, and the recommend tools return books that share Open Library subjects, each with a notice.
 
 The state resets when the server restarts and is not shared between instances. Set a spend limit in the Anthropic console as the hard backstop.
