@@ -124,10 +124,19 @@ export async function findBook(query: string): Promise<FindResult> {
 const normalize = (s: string) =>
   s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").trim();
 
+// Bundles (box sets, omnibuses, series collections) can pass the title-word
+// rule for a single book, e.g. "The Wicked King" matching a Folk of the Air box set.
+const BUNDLE = /\b(box(ed)? set|collection|omnibus|trilogy|series|books 1)\b/i;
+
+/** True if the Open Library title is a bundle that the wanted title is not. */
+const isUnwantedBundle = (olTitle: string, wantedTitle = "") =>
+  BUNDLE.test(olTitle) && !BUNDLE.test(wantedTitle);
+
 /**
  * Look a suggested book up on Open Library. Returns null unless at least half
  * of the suggested title's words (longer than two letters) appear in the
- * matched title, the same rule as the app.
+ * matched title, the same rule as the app, and the match isn't a bundle the
+ * suggestion didn't ask for.
  */
 async function validateCandidate(c: Candidate): Promise<ShelfBook | null> {
   const docs = await search(
@@ -135,7 +144,7 @@ async function validateCandidate(c: Candidate): Promise<ShelfBook | null> {
     VALIDATE_TIMEOUT_MS,
   );
   const doc = docs?.[0];
-  if (!doc?.key) return null;
+  if (!doc?.key || isUnwantedBundle(doc.title ?? "", c.title)) return null;
   const olTitle = normalize(doc.title ?? "");
   const words = normalize(c.title).split(/\s+/).filter((w) => w.length > 2);
   if (!words.length) return null;
@@ -198,7 +207,8 @@ export async function booksBySubjects(subjects: string[], limit: number, exclude
   const seen = new Set(exclude);
   const scored: { book: ShelfBook; score: number }[] = [];
   for (const d of docs) {
-    if (!d.key || seen.has(d.key)) continue;
+    // No suggested title on this path, so every bundle is dropped.
+    if (!d.key || seen.has(d.key) || isUnwantedBundle(d.title ?? "")) continue;
     seen.add(d.key);
     const lower = new Set((d.subject ?? []).map((s) => s.toLowerCase()));
     const shared = terms.filter((t) => lower.has(t.toLowerCase()));
