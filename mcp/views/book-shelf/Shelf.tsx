@@ -1,5 +1,6 @@
 /** A shelf of verified books in BookDNA's Victorian manuscript style. */
 import { useOpenExternal } from "mcp-use/react";
+import { useState } from "react";
 import "./shelf.css";
 
 type Book = { id: string; title: string; author: string; cover: string; reason: string; url: string };
@@ -29,13 +30,25 @@ function Ornament() {
   );
 }
 
-function Cover({ book }: { book: Book }) {
-  if (book.cover) return <img className="bs-cover" src={book.cover} alt="" loading="lazy" />;
+/** Stands in for a missing or unloadable cover: a printed title page. */
+function TitlePage({ book }: { book: Book }) {
   return (
-    <div className="bs-cover bs-cover--blank" aria-hidden="true">
-      <span>{book.title}</span>
+    <div className="bs-cover bs-titlepage" aria-hidden="true">
+      <span className="bs-titlepage__rule" />
+      <span className="bs-titlepage__title">{book.title}</span>
+      <span className="bs-titlepage__by">by</span>
+      <span className="bs-titlepage__author">{book.author}</span>
+      <span className="bs-titlepage__rule" />
     </div>
   );
+}
+
+function Cover({ book }: { book: Book }) {
+  // A cover can fail to load (blocked redirect, missing file); never show a
+  // broken image icon.
+  const [failed, setFailed] = useState(false);
+  if (!book.cover || failed) return <TitlePage book={book} />;
+  return <img className="bs-cover" src={book.cover} alt="" loading="lazy" onError={() => setFailed(true)} />;
 }
 
 function Frame({ children }: { children: React.ReactNode }) {

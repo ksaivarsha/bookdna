@@ -248,7 +248,15 @@ const shelfView = (name: "book-shelf" | "trope-shelf") => ({
   description: "A shelf of book covers with titles, authors and the reason each was chosen",
   prefersBorder: false,
   csp: {
-    resourceDomains: ["https://covers.openlibrary.org", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+    resourceDomains: [
+      "https://covers.openlibrary.org",
+      // Older covers redirect to archive.org, then to a storage node such as
+      // ia800703.us.archive.org.
+      "https://archive.org",
+      "https://*.archive.org",
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+    ],
   },
 });
 

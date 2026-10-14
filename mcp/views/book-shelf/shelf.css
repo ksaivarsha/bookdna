@@ -114,16 +114,51 @@
   background: var(--parchment-d);
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.bs-cover--blank {
+/* Pending skeleton */
+.bs-cover--blank { display: block; }
+
+/* Printed title page shown when a cover is missing or fails to load */
+.bs-titlepage {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  gap: 6px;
+  padding: 14px 10px;
   text-align: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 30% 10%, rgba(255, 246, 214, 0.8), transparent 65%),
+    #ecdcae;
+  outline: 0.5px solid var(--ink-gold);
+  outline-offset: -6px;
+}
+.bs-titlepage__rule {
+  width: 46px;
+  border-top: 0.5px solid var(--ink-gold);
+}
+.bs-titlepage__title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.2;
   font-variant: small-caps;
-  letter-spacing: 0.08em;
-  background: linear-gradient(160deg, #5a3c14, #3a2408);
-  color: #e8c878;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bs-titlepage__by {
+  font-style: italic;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+.bs-titlepage__author {
+  font-size: 0.74rem;
+  font-variant: small-caps;
+  letter-spacing: 0.12em;
+  color: var(--ink-gold);
 }
 
 .bs-title {
