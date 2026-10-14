@@ -65,9 +65,18 @@ type Ctx = { request?: { header(name: string): string | undefined } };
  * every call is "local".
  */
 export function callerOf(ctx: Ctx): string {
-  const forwarded = ctx.request?.header("x-forwarded-for")?.split(",").at(-1)?.trim();
-  return forwarded || ctx.request?.header("x-real-ip") || "local";
+  const hops = ctx.request?.header("x-forwarded-for")?.split(",") ?? [];
+  const forwarded = hops.at(-1)?.trim();
+  const realIp = ctx.request?.header("x-real-ip");
+  if (!loggedSource) {
+    // Once per process, record where caller identity comes from (never the IP),
+    // so a deployment can confirm the per-caller limit sees real clients.
+    loggedSource = true;
+    console.log(`caller source=${forwarded ? `x-forwarded-for hops=${hops.length}` : realIp ? "x-real-ip" : "none (all callers share one bucket)"}`);
+  }
+  return forwarded || realIp || "local";
 }
+let loggedSource = false;
 
 export type Gate =
   | { ok: true }
