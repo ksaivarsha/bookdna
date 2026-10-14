@@ -68,15 +68,15 @@ export function callerOf(ctx: Ctx): string {
   const hops = ctx.request?.header("x-forwarded-for")?.split(",") ?? [];
   const forwarded = hops.at(-1)?.trim();
   const realIp = ctx.request?.header("x-real-ip");
-  if (!loggedSource) {
-    // Once per process, record where caller identity comes from (never the IP),
-    // so a deployment can confirm the per-caller limit sees real clients.
-    loggedSource = true;
-    console.log(`caller source=${forwarded ? `x-forwarded-for hops=${hops.length}` : realIp ? "x-real-ip" : "none (all callers share one bucket)"}`);
+  if (process.env.LOG_CALLER_SHAPE) {
+    // Diagnostic: the shape of the forwarding chain (public/private per hop),
+    // never the addresses themselves.
+    const shape = hops.map((h) => (PRIVATE_IP.test(h.trim()) ? "private" : "public")).join(",");
+    console.log(`caller xff=[${shape}] x-real-ip=${realIp ? (PRIVATE_IP.test(realIp) ? "private" : "public") : "none"}`);
   }
   return forwarded || realIp || "local";
 }
-let loggedSource = false;
+const PRIVATE_IP = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i;
 
 export type Gate =
   | { ok: true }
