@@ -141,7 +141,10 @@ const queryParam = z
   .string()
   .min(1)
   .max(200)
-  .describe('A book title, optionally with the author, e.g. "A Court of Thorns and Roses" or "Piranesi Susanna Clarke"');
+  .describe(
+    "The book to look up by its title. Add the author's name when several books share the title, " +
+      'e.g. "A Court of Thorns and Roses" or "Piranesi Susanna Clarke"',
+  );
 
 const toBookOut = (b: Book) => ({
   id: b.id,
@@ -158,12 +161,12 @@ export const searchBook = server.tool(
     name: "search_book",
     title: "Search for a book",
     description:
-      "Find the single best Open Library match for a book title (optionally with author) and return its title, authors, " +
+      "Find the single best Open Library match for a book and return its title, authors, " +
       "first publication year, cover URL and description. Use this to identify or confirm a book; it does not analyse " +
       "or recommend. Does not use AI, so it is never rate limited.",
     inputSchema: z.object({ query: queryParam }),
     outputSchema: z.object({ book: BookSchema }),
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
   safe("search_book", async ({ query }: { query: string }) => {
     const r = await lookup(query);
@@ -200,7 +203,7 @@ export const getBookDna = server.tool(
       source: SourceSchema,
       notice: z.string().optional(),
     }),
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
   safe("get_book_dna", async ({ query }: { query: string }, caller) => {
     const r = await lookup(query);
@@ -247,6 +250,8 @@ const shelfView = (name: "book-shelf" | "trope-shelf") => ({
   name,
   description: "A shelf of book covers with titles, authors and the reason each was chosen",
   prefersBorder: false,
+  // ChatGPT requires one dedicated origin shared by every view in the app.
+  domain: "https://calm-wave-h30fs.run.mcp-use.com",
   csp: {
     resourceDomains: [
       "https://covers.openlibrary.org",
@@ -263,22 +268,28 @@ const shelfView = (name: "book-shelf" | "trope-shelf") => ({
 export const recommend = server.tool(
   {
     name: "recommend",
-    title: "Recommend books like a book",
+    title: "Recommend similar books",
     description:
-      "Recommend up to 6 books similar to a given book along ONE dimension (the shelf): " +
-      "'storyline' (similar plot), 'tropes' (shared tropes), 'world' (similar setting and subgenre) or 'vibe' (same emotional tone). " +
+      "Recommend up to 6 books similar to a given book along one kind of similarity, chosen with shelf. " +
       "Use this when the reader names a book they liked. Every book is verified on Open Library, and unverifiable ones are dropped. " +
       "Shows a shelf of covers. Uses AI (rate limited); repeats are cached. If the daily AI budget is spent, returns books " +
       "sharing Open Library subjects instead.",
     inputSchema: z.object({
-      query: queryParam.describe("The book the reader liked: a title, optionally with the author"),
+      query: queryParam.describe(
+        "The book the reader liked, by its title; the shelf is built from books similar to it. " +
+          "Add the author's name when several books share the title.",
+      ),
       shelf: z
         .enum(["storyline", "tropes", "world", "vibe"])
-        .describe("Which kind of similarity: storyline, tropes, world (setting/subgenre) or vibe (tone)"),
+        .describe(
+          "The kind of similarity to recommend by: storyline means a similar plot, tropes means shared tropes, " +
+            "world means a similar setting and subgenre, and vibe means the same emotional tone",
+        ),
     }),
     outputSchema: ShelfOutputSchema,
     view: shelfView("book-shelf"),
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    _meta: { "openai/toolInvocation/invoking": "Finding similar books…", "openai/toolInvocation/invoked": "Found similar books" },
   },
   safe("recommend", async ({ query, shelf }: { query: string; shelf: ShelfKey }, caller) => {
     const r = await lookup(query);
@@ -305,7 +316,7 @@ export const recommendByTropes = server.tool(
     name: "recommend_by_tropes",
     title: "Recommend books by tropes",
     description:
-      "Recommend up to 6 books built on the given tropes, optionally in a given kind of world, e.g. tropes " +
+      "Recommend up to 6 books built on the given tropes, in the given kind of world when a setting is named, e.g. tropes " +
       "[\"enemies to lovers\"] with setting \"fae court\". Use this when the reader describes what they want rather than " +
       "naming a book (use recommend for 'books like X'). Every book is verified on Open Library, and unverifiable ones are dropped. " +
       "Shows a shelf of covers. Uses AI (rate limited); repeats are cached. If the daily AI budget is spent, returns " +
@@ -315,16 +326,23 @@ export const recommendByTropes = server.tool(
         .array(z.string().min(1).max(60))
         .min(1)
         .max(6)
-        .describe('One to six trope names, e.g. ["enemies to lovers", "forced proximity"]'),
+        .describe(
+          'Trope names the reader wants, e.g. ["enemies to lovers", "forced proximity"]. ' +
+            "Books that combine several of them are preferred.",
+        ),
       setting: z
         .string()
         .max(80)
         .optional()
-        .describe('Optional world or setting, e.g. "fae court", "Victorian London", "space station"'),
+        .describe(
+          'World or setting the books should take place in, e.g. "fae court", "Victorian London", "space station". ' +
+            "Leave it out to recommend on tropes alone.",
+        ),
     }),
     outputSchema: ShelfOutputSchema,
     view: shelfView("trope-shelf"),
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    _meta: { "openai/toolInvocation/invoking": "Finding books by trope…", "openai/toolInvocation/invoked": "Found books by trope" },
   },
   safe("recommend_by_tropes", async ({ tropes, setting }: { tropes: string[]; setting?: string }, caller) => {
     const ts = normTropes(tropes);
