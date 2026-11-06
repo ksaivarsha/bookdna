@@ -13,6 +13,7 @@ import logging
 import re
 import httpx
 from app.db import get_ol_cache, set_ol_cache
+from app.tracing import span
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,17 @@ async def search(
     client: httpx.AsyncClient | None = None,
     timeout: float = TIMEOUT,
 ) -> list | None:
+    with span("ol.search", **{"ol.limit": params.get("limit", 0)}) as s:
+        docs = await _search(params, client, timeout, s)
+        s.set_attribute("ol.unreachable", docs is None)
+        s.set_attribute("ol.result_count", len(docs or []))
+        return docs
+
+
+async def _search(params, client, timeout, s) -> list | None:
     key = _key(params)
     cached = get_ol_cache(key)
+    s.set_attribute("ol.cache_hit", cached is not None)
     if cached is not None:
         return cached  # serves stale cache during outages
 
@@ -96,8 +106,16 @@ async def work_description(work_key: str) -> str:
     if not work_key.startswith("/works/"):
         return ""
 
+    with span("ol.work") as s:
+        description = await _work_description(work_key, s)
+        s.set_attribute("ol.has_description", bool(description))
+        return description
+
+
+async def _work_description(work_key: str, s) -> str:
     key = _key({"work": work_key})
     cached = get_ol_cache(key)
+    s.set_attribute("ol.cache_hit", cached is not None)
     if cached is not None:
         return _clean_description(cached.get("description", ""))  # older entries were stored raw
 

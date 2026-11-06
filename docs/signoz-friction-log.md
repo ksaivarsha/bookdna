@@ -45,10 +45,14 @@ Each entry has what happened and what we did about it.
    versions into whatever Python is active. *Fix:* ran `--action=requirements`
    to see the list and pinned only `fastapi` and `httpx`.
 
-8. **The Anthropic SDK doesn't use `httpx`.** anthropic 1.12 sends requests via
-   `httpx2`, which `opentelemetry-instrumentation-httpx` doesn't patch, so
-   Claude calls get no automatic HTTP spans. (Useful here: no chance of
-   request headers leaking, but the Claude spans must be added by hand.)
+8. **Unclear whether Claude calls get HTTP spans.** anthropic 1.12 depends on
+   `httpx2` (a fork of httpx), and we expected the httpx instrumentation to
+   miss it. The console run showed it doesn't: each Claude call gets a `POST`
+   span with only `http.method`, `http.url` (`https://api.anthropic.com/v1/messages`)
+   and `http.status_code`. No headers, so the API key isn't exported. These
+   spans carry no token counts, so the `claude.*` spans are still hand-written.
+   For streamed calls the `POST` span is a sibling of `claude.recommendations`,
+   not its child, because that span can't be made current inside a generator.
 
 9. **`dotenv run` overrides the shell by default** (`--override` is the
    default). If `.env` sets `OTEL_TRACES_EXPORTER=otlp`, then
