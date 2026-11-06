@@ -107,6 +107,13 @@ Why 5 seconds was out of reach:
 
 Other things that help the wait feel shorter: placeholder shelves appear the moment the featured book does, and the 50 most popular books are cached in advance.
 
+### What tracing showed
+
+The first SigNoz traces (see [Tracing with SigNoz](#4-tracing-with-signoz-optional)) found two slow spots:
+
+- **Searches wait about 13 s on the three-shelf Claude call.** After the storyline shelf arrives, the `claude.recommendations` call writing the other three shelves is the only work still running for about 13 s. This is the "last shelf" cost of the 8-asked, 6-kept compromise above.
+- **For You takes about 26 s.** About 23 s of that is the single `claude.taste` call, which isn't streamed and asks for 18 books before anything is returned. It's the slowest request in the app. Streaming it shelf by shelf, as search already does, is the obvious next step.
+
 ### Pre-warming the cache
 
 `backend/scripts/prewarm.py` runs a list of 50 popular romantasy and fantasy books through the same code as a real search, caching each book's Open Library lookups, DNA profile, and validated shelves. It never writes search history, so For You is unaffected. Books that are already cached are skipped. A full run takes about 5 minutes and costs about $0.12.

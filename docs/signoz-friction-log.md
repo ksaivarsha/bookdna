@@ -91,10 +91,29 @@ Each entry has what happened and what we did about it.
     the ingestion key client-side). *Fix:* the frontend makes one random
     `traceparent` per search and sends it on all three calls. The parent span
     it names is never exported, so expect SigNoz to show the three request
-    spans under a missing root.
+    spans under a missing root. *Confirmed:* SigNoz shows the full search trace
+    under a "Missing Span" root.
 
 14. **The `traceparent` header triggers CORS preflights.** It's a non-simple
     header, so `GET /books/search` now gets an `OPTIONS` preflight, which
     shows up as its own one-span trace (browsers don't send custom headers on
     preflights). Harmless noise; `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` filters by
     URL, not method, so it can't drop them.
+
+## What SigNoz showed
+
+First traces in SigNoz Cloud (us2) on 2026-11-05. The service appeared as
+`bookdna-backend`, and token counts showed up in the trace header.
+
+15. **For You takes about 26 s, almost all of it one Claude call.** The
+    `GET /history/{session}/for-you` trace took about 26 s, and
+    `claude.taste` took about 23 s of that. That call isn't streamed, leaves
+    thinking on, and asks for 18 books before anything is returned, so the
+    whole section waits on it. Before tracing, this call had no timing log.
+
+16. **Searches wait about 13 s on the three-shelf Claude call.** In search
+    traces there's a gap of about 13 s where the only work running is the
+    `claude.recommendations` call that writes *Similar Tropes*, *Similar
+    World/Setting* and *Same Vibe* (8 books each). This matches the README's
+    18–22.5 s "last shelf" figure, and it's the cost of the shipped
+    "8 asked, 6 kept" compromise.
