@@ -3,6 +3,8 @@ import logging
 import os
 import anthropic
 import jiter
+from opentelemetry import trace
+from app.tracing import mark_error, span, tracer
 
 # Log exception type names only: messages and request details are never logged,
 # so the API key cannot end up in the logs.
@@ -43,7 +45,22 @@ def _api_key() -> str:
     return key
 
 
-def _text(message, step: str) -> str | None:
+def _claude_attributes(step: str) -> dict:
+    # Model and step only: the prompt and the response text never go on a span.
+    return {
+        "gen_ai.provider.name": "anthropic",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": MODEL,
+        "bookdna.step": step.replace(" ", "_"),
+    }
+
+
+def _text(message, step: str, s: trace.Span | None = None) -> str | None:
+    s = s or trace.get_current_span()
+    s.set_attribute("gen_ai.response.model", message.model)
+    s.set_attribute("gen_ai.usage.input_tokens", message.usage.input_tokens)
+    s.set_attribute("gen_ai.usage.output_tokens", message.usage.output_tokens)
+    s.set_attribute("gen_ai.response.finish_reasons", [message.stop_reason or ""])
     logger.info(
         "usage step=%s in=%d out=%d",
         step.replace(" ", "_"), message.usage.input_tokens, message.usage.output_tokens,
@@ -92,6 +109,11 @@ async def extract_profile(book: dict) -> dict | None:
 
 Use your own knowledge of the book if the description is thin."""
 
+    with span("claude.profile", **_claude_attributes("profile extraction")):
+        return await _ask_profile(api_key, prompt)
+
+
+async def _ask_profile(api_key: str, prompt: str) -> dict | None:
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         message = await client.messages.create(
@@ -111,6 +133,7 @@ Use your own knowledge of the book if the description is thin."""
         return profile
     except Exception as e:
         logger.error("profile extraction failed: %s", type(e).__name__)
+        mark_error(e)
         return None
 
 
@@ -180,6 +203,12 @@ async def _stream_fields(
     if effort:
         output_config["effort"] = effort
 
+    # Not made the current span: this generator yields to its caller, which
+    # would otherwise run inside the span between yields.
+    s = tracer.start_span(
+        "claude.recommendations",
+        attributes={**_claude_attributes(step), "bookdna.shelves": schema["required"]},
+    )
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
         async with client.messages.stream(
@@ -194,14 +223,19 @@ async def _stream_fields(
                 parsed = jiter.from_json(buf.encode(), partial_mode="on")
                 if isinstance(parsed, dict):
                     for field in complete(parsed, done=False):
+                        s.add_event("shelf_generated", {"shelf": field[0]})
                         yield field
             message = await stream.get_final_message()
-        raw = _text(message, step)
+        raw = _text(message, step, s)
         if raw is not None:
             for field in complete(json.loads(raw), done=True):
+                s.add_event("shelf_generated", {"shelf": field[0]})
                 yield field
     except Exception as e:
         logger.error("%s failed: %s", step, type(e).__name__)
+        mark_error(e, s)
+    finally:
+        s.end()
 
 
 async def stream_recommendations(
@@ -315,7 +349,8 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences — in th
   ]
 }}"""
 
-    return await _ask_categories(api_key, prompt, "taste recommendations")
+    with span("claude.taste", **_claude_attributes("taste recommendations")):
+        return await _ask_categories(api_key, prompt, "taste recommendations")
 
 
 async def _ask_categories(api_key: str, prompt: str, step: str) -> dict | None:
@@ -338,4 +373,5 @@ async def _ask_categories(api_key: str, prompt: str, step: str) -> dict | None:
         return json.loads(raw[start:end])
     except Exception as e:
         logger.error("%s failed: %s", step, type(e).__name__)
+        mark_error(e)
         return None

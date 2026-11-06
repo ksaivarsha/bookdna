@@ -107,6 +107,13 @@ Why 5 seconds was out of reach:
 
 Other things that help the wait feel shorter: placeholder shelves appear the moment the featured book does, and the 50 most popular books are cached in advance.
 
+### What tracing showed
+
+The first SigNoz traces (see [Tracing with SigNoz](#4-tracing-with-signoz-optional)) found two slow spots:
+
+- **Searches wait about 13 s on the three-shelf Claude call.** After the storyline shelf arrives, the `claude.recommendations` call writing the other three shelves is the only work still running for about 13 s. This is the "last shelf" cost of the 8-asked, 6-kept compromise above.
+- **For You takes about 26 s.** About 23 s of that is the single `claude.taste` call, which isn't streamed and asks for 18 books before anything is returned. It's the slowest request in the app. Streaming it shelf by shelf, as search already does, is the obvious next step.
+
 ### Pre-warming the cache
 
 `backend/scripts/prewarm.py` runs a list of 50 popular romantasy and fantasy books through the same code as a real search, caching each book's Open Library lookups, DNA profile, and validated shelves. It never writes search history, so For You is unaffected. Books that are already cached are skipped. A full run takes about 5 minutes and costs about $0.12.
@@ -171,6 +178,29 @@ npm run dev
 ```
 
 The app opens at **http://localhost:5173**.
+
+### 4. Tracing with SigNoz (optional)
+
+Each search is sent to [SigNoz Cloud](https://signoz.io) as one trace. It has
+spans for the Open Library lookups, each Claude call (model and token counts,
+never prompts or keys) and each shelf as it streams. Put the `OTEL_*` settings
+from `.env.example` in `backend/.env` with your ingestion key, then start the
+backend with:
+
+```bash
+cd backend
+dotenv run -- opentelemetry-instrument uvicorn app.main:app
+```
+
+- Don't add `--reload`: it breaks instrumentation. Plain
+  `uvicorn app.main:app --reload` still works, just without traces.
+- On Windows the prompt comes back right away while the server keeps running
+  in the same window. Stop it with Ctrl+C, or if that doesn't work,
+  `Get-NetTCPConnection -LocalPort 8000 | % { Stop-Process -Id $_.OwningProcess }`.
+- To check spans locally first, set `OTEL_TRACES_EXPORTER=console` in the
+  shell before running the same command.
+
+Setup notes are in [docs/signoz-friction-log.md](docs/signoz-friction-log.md).
 
 ---
 

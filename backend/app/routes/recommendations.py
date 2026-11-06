@@ -4,10 +4,12 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 import httpx
+from opentelemetry import context as otel_context, trace
 from app.db import get_cached_dna, save_dna, get_profile, save_profile
 from app.services.dna import SHELF_KEYS, extract_profile, stream_recommendations
 from app.services.ol import search as ol_search
 from app.timing import stage
+from app.tracing import mark_error, tracer
 
 # Validation lookups are many and small; a short timeout keeps one slow
 # Open Library response from holding up a whole shelf.
@@ -125,6 +127,10 @@ async def _dna_events(book: dict):
     book_id = book.get("id", "")
     shelves_sent = 0
     tasks: list[asyncio.Task] = []
+    # Shelf spans hang off the request span (not the Claude call that produced
+    # them) and stay open until the shelf is sent or dropped.
+    request_ctx = otel_context.get_current()
+    shelf_spans: list[trace.Span] = []
     try:
         queue: asyncio.Queue = asyncio.Queue()
         counts = {"passed": 0, "suggested": 0}
@@ -147,11 +153,23 @@ async def _dna_events(book: dict):
             tasks.append(asyncio.create_task(make_profile()))
 
         async def validate(label: str, candidates: list):
-            with stage("validation_" + SHELF_KEYS[label]):
-                valid = await validate_category(candidates, limit=None)
+            span = tracer.start_span(
+                "shelf",
+                context=request_ctx,
+                attributes={
+                    "bookdna.shelf": SHELF_KEYS[label],
+                    "bookdna.shelf.cached": bool(cached),
+                    "bookdna.shelf.suggested": len(candidates),
+                },
+            )
+            shelf_spans.append(span)
+            with trace.use_span(span, record_exception=False, set_status_on_exception=False):
+                with stage("validation_" + SHELF_KEYS[label]):
+                    valid = await validate_category(candidates, limit=None)
+            span.set_attribute("bookdna.shelf.validated", len(valid))
             counts["passed"] += len(valid)
             counts["suggested"] += len(candidates)
-            await queue.put(("shelf", label, valid))
+            await queue.put(("shelf", label, valid, span))
 
         async def generate(labels: list[str], per_shelf: int, raw: dict):
             with stage("recommendations_" + "_".join(SHELF_KEYS[l] for l in labels)):
@@ -183,20 +201,28 @@ async def _dna_events(book: dict):
             if item[0] == "profile":
                 yield _event({"type": "profile", "profile": item[1]})
                 continue
-            _, label, valid = item
-            books = [b for b in valid if b["id"] not in shown][:SHELF_SIZE]
+            _, label, valid, span = item
+            fresh = [b for b in valid if b["id"] not in shown]
+            books = fresh[:SHELF_SIZE]
             shown.update(b["id"] for b in books)
+            span.set_attribute("bookdna.shelf.duplicates", len(valid) - len(fresh))
+            span.set_attribute("bookdna.shelf.sent", len(books))
             if books:
                 shelves_sent += 1
                 yield _event({"type": "shelf", "label": label, "books": books})
+            span.end()
         await producer  # re-raise anything the producer hit
         logger.info("validation passed=%d of=%d", counts["passed"], counts["suggested"])
     except Exception as e:
         logger.error("dna stream failed: %s", type(e).__name__)
+        mark_error(e)
     finally:
         for t in tasks:
             if not t.done():
                 t.cancel()  # client went away mid-stream
+        for span in shelf_spans:
+            if span.is_recording():
+                span.end()  # shelf never sent (client left or the stream failed)
     yield _event({"type": "done", "fallback": shelves_sent == 0})
 
 

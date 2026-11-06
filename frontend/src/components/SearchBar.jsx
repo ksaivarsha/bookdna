@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { searchBooks, addToHistory, getRelated, streamRecommendations } from '../services/api'
+import { searchBooks, addToHistory, getRelated, streamRecommendations, newSearchTrace } from '../services/api'
 import { CategorySection } from './CategorySection'
 import { FeaturedBook } from './FeaturedBook'
 
@@ -64,13 +64,14 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
     setProfile(null)
     setGenrePicks([])
     setCatLoading(false)
+    const trace = newSearchTrace()  // lookup, genre picks and shelves share one trace
     try {
-      const data = await searchBooks(q)
+      const data = await searchBooks(q, trace)
       if (controller.signal.aborted) return
       setResults(data)
       addToHistory(data.source)
 
-      getRelated(data.source).then(picks => {
+      getRelated(data.source, trace).then(picks => {
         if (!controller.signal.aborted) setGenrePicks(picks)
       })
 
@@ -81,7 +82,7 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
         if (event.type === 'shelf') {
           setCategories(prev => [...(prev || []), event].sort(byShelfOrder))
         }
-      }, controller.signal).finally(() => {
+      }, controller.signal, trace).finally(() => {
         if (!controller.signal.aborted) setCatLoading(false)
       })
     } catch (err) {

@@ -1,6 +1,12 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-python-dotenv==1.0.1
+python-dotenv[cli]==1.0.1
 pydantic==2.10.3
 httpx==0.28.0
 anthropic>=0.40.0
+# Tracing (SigNoz). Pinned instead of `opentelemetry-bootstrap --action=install`,
+# which would pull in ~20 instrumentations; this app only needs FastAPI + httpx.
+opentelemetry-distro==0.66b2
+opentelemetry-exporter-otlp==1.45.2
+opentelemetry-instrumentation-fastapi==0.66b2
+opentelemetry-instrumentation-httpx==0.66b2
