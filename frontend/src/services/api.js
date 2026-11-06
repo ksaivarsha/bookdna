@@ -9,8 +9,20 @@ function getSessionId() {
   return id
 }
 
-export async function searchBooks(query) {
-  const response = await fetch(`${BASE_URL}/books/search?q=${encodeURIComponent(query)}`)
+function randomHex(bytes) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Headers that put every request of one search into a single backend trace
+ * (W3C trace context). Nothing is sent from the browser to the tracing backend.
+ */
+export function newSearchTrace() {
+  return { traceparent: `00-${randomHex(16)}-${randomHex(8)}-01` }
+}
+
+export async function searchBooks(query, trace = {}) {
+  const response = await fetch(`${BASE_URL}/books/search?q=${encodeURIComponent(query)}`, { headers: trace })
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.detail || 'Search failed')
@@ -39,11 +51,11 @@ export async function getWorkDescription(key, signal) {
   return (await response.json()).description || ''
 }
 
-export async function getRelated(book) {
+export async function getRelated(book, trace = {}) {
   try {
     const response = await fetch(`${BASE_URL}/books/related`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...trace },
       body: JSON.stringify(book),
     })
     if (!response.ok) return []
@@ -58,11 +70,11 @@ export async function getRelated(book) {
  * {type: 'profile' | 'shelf' | 'done'} event as it arrives.
  * Resolves when the stream ends; never rejects (a failure just ends the stream early).
  */
-export async function streamRecommendations(book, onEvent, signal) {
+export async function streamRecommendations(book, onEvent, signal, trace = {}) {
   try {
     const response = await fetch(`${BASE_URL}/recommendations/by-category`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...trace },
       body: JSON.stringify(book),
       signal,
     })
