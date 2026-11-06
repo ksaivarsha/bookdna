@@ -172,6 +172,29 @@ npm run dev
 
 The app opens at **http://localhost:5173**.
 
+### 4. Tracing with SigNoz (optional)
+
+Each search is sent to [SigNoz Cloud](https://signoz.io) as one trace. It has
+spans for the Open Library lookups, each Claude call (model and token counts,
+never prompts or keys) and each shelf as it streams. Put the `OTEL_*` settings
+from `.env.example` in `backend/.env` with your ingestion key, then start the
+backend with:
+
+```bash
+cd backend
+dotenv run -- opentelemetry-instrument uvicorn app.main:app
+```
+
+- Don't add `--reload`: it breaks instrumentation. Plain
+  `uvicorn app.main:app --reload` still works, just without traces.
+- On Windows the prompt comes back right away while the server keeps running
+  in the same window. Stop it with Ctrl+C, or if that doesn't work,
+  `Get-NetTCPConnection -LocalPort 8000 | % { Stop-Process -Id $_.OwningProcess }`.
+- To check spans locally first, set `OTEL_TRACES_EXPORTER=console` in the
+  shell before running the same command.
+
+Setup notes are in [docs/signoz-friction-log.md](docs/signoz-friction-log.md).
+
 ---
 
 ## What I'd build next

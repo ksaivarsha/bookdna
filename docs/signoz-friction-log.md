@@ -64,10 +64,10 @@ Each entry has what happened and what we did about it.
     the command with `os.execl`, which on Windows starts a new process and
     exits the original instead of replacing it. The terminal prompt comes back
     while uvicorn keeps running and logging in the same window, and anything
-    wrapping it (like `dotenv run`) thinks it has finished. Ctrl+C in that
-    window still stops it; otherwise find the PID with
-    `Get-NetTCPConnection -LocalPort 8000` and use `Stop-Process`. The SigNoz
-    docs don't mention this.
+    wrapping it (like `dotenv run`) thinks it has finished. Ctrl+C in the same
+    console should reach it (not yet confirmed interactively); otherwise find
+    the PID with `Get-NetTCPConnection -LocalPort 8000` and use
+    `Stop-Process`. The SigNoz docs don't mention this.
 
 11. **httpx spans record full stack traces.** When an Open Library request
     timed out, the httpx instrumentation attached an `exception` event with
