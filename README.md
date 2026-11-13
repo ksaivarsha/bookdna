@@ -204,6 +204,43 @@ Setup notes are in [docs/signoz-friction-log.md](docs/signoz-friction-log.md).
 
 ---
 
+## Product analytics with PostHog
+
+The frontend sends a small, anonymous funnel to [PostHog](https://posthog.com):
+`$pageview` → `search_submitted` → `first_shelf_shown` (with time since the
+search) → `book_detail_opened` → `seek_clicked`. Book events carry only the
+Open Library work ID. Analytics is optional: put `VITE_POSTHOG_PROJECT_TOKEN`
+in `frontend/.env.local` (see `.env.example`) to turn it on, or leave it empty to run without it.
+
+**Privacy choices** (all in [frontend/src/analytics.js](frontend/src/analytics.js)):
+
+- **No search text.** `search_submitted` has no properties, and a
+  `before_send` hook removes query strings and hashes from every URL and
+  referrer, so `?q=…` never leaves the browser.
+- **Anonymous only.** No `identify` calls and `person_profiles: 'identified_only'`,
+  so no person profiles are created.
+- **No autocapture and no session recording.** Only the events above are sent.
+- **No localhost test-user tagging.** With `defaults: '2026-08-30'`, the SDK
+  marks localhost visitors as internal/test users. That sends a `$set` and
+  turns on person processing for every event, overriding `identified_only`.
+  Setting `internal_or_test_user_hostname: null` turns this off.
+
+**Reverse proxy.** On the development machine, browser requests to
+`us.i.posthog.com` were blocked before they left (DevTools showed
+`(blocked:other)`, which points to a system-level block rather than an
+extension). The SDK now sends to `/ingest` on the app's own origin, and the
+Vite dev server forwards it, as PostHog's docs recommend: `/ingest/static`
+and `/ingest/array` go to `us-assets.i.posthog.com`, and everything else
+under `/ingest` goes to `us.i.posthog.com` ([frontend/vite.config.js](frontend/vite.config.js)).
+`ui_host` stays `https://us.posthog.com`. In DevTools you should see
+`localhost:5173/ingest/e/` requests returning 200 and nothing sent to
+`*.posthog.com` directly.
+
+The proxy exists only under `npm run dev`. A production deployment needs the
+same `/ingest` rewrite at the hosting layer.
+
+---
+
 ## What I'd build next
 
 1. **Normalized settings:** have Claude pick each book's world setting from a fixed list instead of writing free text, so For You can count settings across books the way it already counts tropes and subgenres.
