@@ -9,7 +9,12 @@ import { usePostHog } from '@posthog/react'
  */
 
 const TOKEN = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN
-const HOST  = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
+
+// Events go to our own origin and are reverse-proxied to PostHog (see the
+// Vite server proxy in vite.config.js), so this machine never calls
+// *.posthog.com directly. ui_host keeps toolbar/links pointing at PostHog.
+const API_HOST = '/ingest'
+const UI_HOST  = 'https://us.posthog.com'
 
 export const analyticsEnabled = Boolean(TOKEN)
 
@@ -50,9 +55,14 @@ function scrubEvent(event) {
 export function initAnalytics() {
   if (!analyticsEnabled) return null
   posthog.init(TOKEN, {
-    api_host: HOST,
+    api_host: API_HOST,
+    ui_host: UI_HOST,
     defaults: '2026-08-30',           // pageviews on history change (SPA navigation)
     person_profiles: 'identified_only', // we never identify, so everything stays anonymous
+    // These defaults tag localhost visitors as internal/test users, which sends
+    // a $set and turns on person processing for every later event, overriding
+    // identified_only. Opt out so dev behaves like production.
+    internal_or_test_user_hostname: null,
     autocapture: false,
     disable_session_recording: true,
     before_send: scrubEvent,
