@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { searchBooks, addToHistory, getRelated, streamRecommendations, newSearchTrace } from '../services/api'
 import { CategorySection } from './CategorySection'
 import { FeaturedBook } from './FeaturedBook'
+import { EVENTS, useTrack, workId } from '../analytics'
 
 const SHELF_ORDER = ['Similar Storyline', 'Similar Tropes', 'Similar World/Setting', 'Same Vibe']
 const byShelfOrder = (a, b) => SHELF_ORDER.indexOf(a.label) - SHELF_ORDER.indexOf(b.label)
@@ -32,6 +33,7 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
   const [profile, setProfile]       = useState(null)
   const [genrePicks, setGenrePicks] = useState([])
   const streamRef = useRef(null)
+  const track = useTrack()
 
   // The URL's ?q= drives the search: typing a search, the back button,
   // a shared link, and the logo (which clears it) all arrive here.
@@ -65,6 +67,8 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
     setGenrePicks([])
     setCatLoading(false)
     const trace = newSearchTrace()  // lookup, genre picks and shelves share one trace
+    const startedAt = performance.now()
+    let shelfShown = false
     try {
       const data = await searchBooks(q, trace)
       if (controller.signal.aborted) return
@@ -80,6 +84,14 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
         if (controller.signal.aborted) return
         if (event.type === 'profile') setProfile(event.profile)
         if (event.type === 'shelf') {
+          if (!shelfShown) {
+            shelfShown = true
+            track(EVENTS.firstShelfShown, {
+              work_id: workId(data.source),
+              shelf_label: event.label,
+              ms_since_search: Math.round(performance.now() - startedAt),
+            })
+          }
           setCategories(prev => [...(prev || []), event].sort(byShelfOrder))
         }
       }, controller.signal, trace).finally(() => {
@@ -95,6 +107,7 @@ export function SearchBar({ activeQuery, onSubmit, onHome, onSelectBook }) {
   function handleSubmit() {
     const q = draft.trim()
     if (!q) return
+    track(EVENTS.searchSubmitted)  // deliberately no query text
     if (q === activeQuery) runSearch(q)  // same URL: search again explicitly
     else onSubmit(q)
   }

@@ -11,6 +11,7 @@ import { SearchBar }            from './components/SearchBar'
 import { ForYouSection }        from './components/ForYouSection'
 import { CinematicTransition }  from './components/CinematicTransition'
 import { BookDetailPanel }      from './components/BookDetailPanel'
+import { EVENTS, useTrack, workId } from './analytics'
 
 function readQuery() {
   return (new URLSearchParams(window.location.search).get('q') || '').trim()
@@ -36,8 +37,17 @@ function BookPage() {
 
   const [selectedBook, setSelectedBook] = useState(null)
   const closePanel = useCallback(() => setSelectedBook(null), [])
+  const track = useTrack()
+
+  // Tracked on the click itself (not in the panel's effect), so StrictMode
+  // can't double-count it.
+  function openBook(book) {
+    track(EVENTS.bookDetailOpened, { work_id: workId(book) })
+    setSelectedBook(book)
+  }
 
   function seekBook(book) {
+    track(EVENTS.seekClicked, { work_id: workId(book) })
     setSelectedBook(null)
     navigate([book.title, book.authors?.[0]].filter(Boolean).join(' '))
   }
@@ -66,10 +76,10 @@ function BookPage() {
           activeQuery={query}
           onSubmit={navigate}
           onHome={() => navigate('')}
-          onSelectBook={setSelectedBook}
+          onSelectBook={openBook}
         />
 
-        {!query && <ForYouSection onSelectBook={setSelectedBook} />}
+        {!query && <ForYouSection onSelectBook={openBook} />}
 
         <DividerOrnament variant="tail" />
       </main>
